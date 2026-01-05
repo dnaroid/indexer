@@ -99,3 +99,14 @@ node --experimental-test-coverage --test lib/mcp-tools.test.js lib/indexer-core.
 ## License
 
 MIT
+
+<!-- indexer-cli-start -->
+### Indexer CLI (Local Mode)
+
+- `indexer init` — creates `.indexer/`, sets up local config, and appends the `indexer` MCP server to `.mcp.json`.
+- `indexer status` — shows status.
+- `indexer clean` — drops the collection and reindexes.
+- `indexer uninstall` — removes `.indexer/` and the `indexer` entry in `.mcp.json`.
+
+MCP hookup for Claude is automatic: `.mcp.json` is updated during `indexer init`.
+<!-- indexer-cli-end -->
