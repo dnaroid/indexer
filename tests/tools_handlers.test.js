@@ -10,7 +10,8 @@ const mockDeps = {
   listProjectFiles: async () => ['file1.js', 'dir/file2.js'],
   extractSymbols: async (path, content) => [{name: 'MockClass', kind: 'class', start: 1}],
   buildTreeText: (files) => `MockTree(${files.length})`,
-  runRipgrep: async (name) => [{path: 'file.js', line: 10, snippet: `use ${name}`}],
+  runRipgrep: async (name) => [{path: 'file.js', line: 10, column: 5, snippet: `use ${name}`}],
+  filterReferences: async (refs) => refs,
   readFile: async () => 'mock content'
 }
 

@@ -7,7 +7,8 @@ import {
   extractSymbols,
   buildTreeText,
   runRipgrep,
-  detectLanguage
+  detectLanguage,
+  filterReferences
 } from '../lib/mcp-tools.js'
 import {initTreeSitter} from '../lib/tree-sitter.js'
 
@@ -96,6 +97,7 @@ const realDeps = {
   extractSymbols,
   buildTreeText,
   runRipgrep: (pattern) => runRipgrep(pattern, PLAYGROUND_DIR), // Inject playground dir
+  filterReferences,
   readFile: fs.readFile
 }
 
