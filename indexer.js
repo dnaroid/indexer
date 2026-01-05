@@ -101,10 +101,8 @@ async function main() {
     printBanner()
   }
 
-  // Check updates on startup for interactive mode, or status
-  if (!command || command === 'status') {
-    await checkAndAutoUpdate(command)
-  }
+  // Check updates on startup
+  await checkAndAutoUpdate(command)
 
   if (!command) {
     await interactiveMenu()
