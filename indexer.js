@@ -223,6 +223,40 @@ async function upsertRootMcpConfig(paths) {
   await fs.writeFile(paths.rootMcpPath, JSON.stringify(data, null, 2) + '\n', 'utf8')
 }
 
+async function upsertKilocodeMcpConfig(paths) {
+  const kilocodePath = path.join(paths.root, 'kilocode', 'mcp.json')
+  
+  if (!(await pathExists(kilocodePath))) {
+    return
+  }
+
+  const indexerConfig = {
+    command: 'indexer',
+    args: ['mcp', `--cwd=${paths.root}`]
+  }
+
+  let data = {}
+  try {
+    const text = await fs.readFile(kilocodePath, 'utf8')
+    data = JSON.parse(text)
+  } catch (e) {
+    warn(`Invalid kilocode/mcp.json: ${e.message}`)
+    return
+  }
+
+  data.mcpServers = {
+    ...(data.mcpServers || {}),
+    indexer: indexerConfig
+  }
+
+  try {
+    await fs.writeFile(kilocodePath, JSON.stringify(data, null, 2) + '\n', 'utf8')
+    log('Updated kilocode/mcp.json with indexer config')
+  } catch (e) {
+    warn(`Failed to update kilocode/mcp.json: ${e.message}`)
+  }
+}
+
 async function upsertCodexArgsConfig(paths) {
   const args = JSON.stringify(['mcp', `--cwd=${paths.root}`])
   const line = `-c mcp_servers.indexer.command="indexer" -c mcp_servers.indexer.args='${args}'`
@@ -268,6 +302,34 @@ async function removeRootMcpIndexer(rootMcpPath) {
       return
     }
     warn(`Skipping .mcp.json cleanup: ${e.message}`)
+  }
+}
+
+async function removeKilocodeMcpIndexer(root) {
+  const kilocodePath = path.join(root, 'kilocode', 'mcp.json')
+
+  if (!(await pathExists(kilocodePath))) {
+    return
+  }
+
+  try {
+    const text = await fs.readFile(kilocodePath, 'utf8')
+    const data = JSON.parse(text)
+    if (!data.mcpServers || !data.mcpServers.indexer) {
+      return
+    }
+
+    const {['indexer']: _, ...rest} = data.mcpServers
+    data.mcpServers = rest
+
+    if (Object.keys(data.mcpServers).length === 0) {
+      delete data.mcpServers
+    }
+
+    await fs.writeFile(kilocodePath, JSON.stringify(data, null, 2) + '\n', 'utf8')
+    log('Removed indexer config from kilocode/mcp.json')
+  } catch (e) {
+    warn(`Skipping kilocode/mcp.json cleanup: ${e.message}`)
   }
 }
 
@@ -515,6 +577,7 @@ async function handleInit() {
 
   await fs.writeFile(paths.envPath, envBody, 'utf8')
   await upsertRootMcpConfig(paths)
+  await upsertKilocodeMcpConfig(paths)
   const codexArgs = await upsertCodexArgsConfig(paths)
 
   await fs.writeFile(paths.toIndexPath, renderToIndex({type: projectType, dirs, exts}), 'utf8')
@@ -704,6 +767,7 @@ async function handleUninstall() {
   await fs.rm(paths.dotDir, {recursive: true, force: true})
   await removeGitignoreEntry(root, '.indexer/')
   await removeRootMcpIndexer(paths.rootMcpPath)
+  await removeKilocodeMcpIndexer(root)
   await removeCodexArgsIndexer(paths.codexArgsPath)
   await removeReadmeCliSection(root)
 
