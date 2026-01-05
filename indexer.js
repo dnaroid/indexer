@@ -200,11 +200,9 @@ function renderEnv({projectId, collectionName, workspaceDir}) {
 }
 
 async function upsertRootMcpConfig(paths) {
-  const scriptPath = __filename
-
   const indexerConfig = {
-    command: 'node',
-    args: [scriptPath, 'mcp', `--cwd=${paths.root}`]
+    command: 'indexer',
+    args: ['mcp', `--cwd=${paths.root}`]
   }
 
   let data = {}
