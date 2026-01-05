@@ -224,9 +224,44 @@ async function upsertRootMcpConfig(paths) {
 }
 
 async function upsertKilocodeMcpConfig(paths) {
-  const kilocodePath = path.join(paths.root, 'kilocode', 'mcp.json')
+  const targets = ['kilocode/mcp.json', '.kilocode/mcp.json']
   
-  if (!(await pathExists(kilocodePath))) {
+  for (const rel of targets) {
+    const targetPath = path.join(paths.root, rel)
+    if (!(await pathExists(targetPath))) continue
+
+    const indexerConfig = {
+      command: 'indexer',
+      args: ['mcp', `--cwd=${paths.root}`]
+    }
+
+    let data = {}
+    try {
+      const text = await fs.readFile(targetPath, 'utf8')
+      data = JSON.parse(text)
+    } catch (e) {
+      warn(`Invalid ${rel}: ${e.message}`)
+      continue
+    }
+
+    data.mcpServers = {
+      ...(data.mcpServers || {}),
+      indexer: indexerConfig
+    }
+
+    try {
+      await fs.writeFile(targetPath, JSON.stringify(data, null, 2) + '\n', 'utf8')
+      log(`Updated ${rel} with indexer config`)
+    } catch (e) {
+      warn(`Failed to update ${rel}: ${e.message}`)
+    }
+  }
+}
+
+async function upsertGeminiMcpConfig(paths) {
+  const geminiPath = path.join(paths.root, '.gemini', 'settings.json')
+  
+  if (!(await pathExists(geminiPath))) {
     return
   }
 
@@ -237,10 +272,10 @@ async function upsertKilocodeMcpConfig(paths) {
 
   let data = {}
   try {
-    const text = await fs.readFile(kilocodePath, 'utf8')
+    const text = await fs.readFile(geminiPath, 'utf8')
     data = JSON.parse(text)
   } catch (e) {
-    warn(`Invalid kilocode/mcp.json: ${e.message}`)
+    warn(`Invalid .gemini/settings.json: ${e.message}`)
     return
   }
 
@@ -250,10 +285,10 @@ async function upsertKilocodeMcpConfig(paths) {
   }
 
   try {
-    await fs.writeFile(kilocodePath, JSON.stringify(data, null, 2) + '\n', 'utf8')
-    log('Updated kilocode/mcp.json with indexer config')
+    await fs.writeFile(geminiPath, JSON.stringify(data, null, 2) + '\n', 'utf8')
+    log('Updated .gemini/settings.json with indexer config')
   } catch (e) {
-    warn(`Failed to update kilocode/mcp.json: ${e.message}`)
+    warn(`Failed to update .gemini/settings.json: ${e.message}`)
   }
 }
 
@@ -306,14 +341,43 @@ async function removeRootMcpIndexer(rootMcpPath) {
 }
 
 async function removeKilocodeMcpIndexer(root) {
-  const kilocodePath = path.join(root, 'kilocode', 'mcp.json')
+  const targets = ['kilocode/mcp.json', '.kilocode/mcp.json']
 
-  if (!(await pathExists(kilocodePath))) {
+  for (const rel of targets) {
+    const targetPath = path.join(root, rel)
+    if (!(await pathExists(targetPath))) continue
+
+    try {
+      const text = await fs.readFile(targetPath, 'utf8')
+      const data = JSON.parse(text)
+      if (!data.mcpServers || !data.mcpServers.indexer) {
+        continue
+      }
+
+      const {['indexer']: _, ...rest} = data.mcpServers
+      data.mcpServers = rest
+
+      if (Object.keys(data.mcpServers).length === 0) {
+        delete data.mcpServers
+      }
+
+      await fs.writeFile(targetPath, JSON.stringify(data, null, 2) + '\n', 'utf8')
+      log(`Removed indexer config from ${rel}`)
+    } catch (e) {
+      warn(`Skipping ${rel} cleanup: ${e.message}`)
+    }
+  }
+}
+
+async function removeGeminiMcpIndexer(root) {
+  const geminiPath = path.join(root, '.gemini', 'settings.json')
+
+  if (!(await pathExists(geminiPath))) {
     return
   }
 
   try {
-    const text = await fs.readFile(kilocodePath, 'utf8')
+    const text = await fs.readFile(geminiPath, 'utf8')
     const data = JSON.parse(text)
     if (!data.mcpServers || !data.mcpServers.indexer) {
       return
@@ -326,10 +390,10 @@ async function removeKilocodeMcpIndexer(root) {
       delete data.mcpServers
     }
 
-    await fs.writeFile(kilocodePath, JSON.stringify(data, null, 2) + '\n', 'utf8')
-    log('Removed indexer config from kilocode/mcp.json')
+    await fs.writeFile(geminiPath, JSON.stringify(data, null, 2) + '\n', 'utf8')
+    log('Removed indexer config from .gemini/settings.json')
   } catch (e) {
-    warn(`Skipping kilocode/mcp.json cleanup: ${e.message}`)
+    warn(`Skipping .gemini/settings.json cleanup: ${e.message}`)
   }
 }
 
@@ -578,6 +642,7 @@ async function handleInit() {
   await fs.writeFile(paths.envPath, envBody, 'utf8')
   await upsertRootMcpConfig(paths)
   await upsertKilocodeMcpConfig(paths)
+  await upsertGeminiMcpConfig(paths)
   const codexArgs = await upsertCodexArgsConfig(paths)
 
   await fs.writeFile(paths.toIndexPath, renderToIndex({type: projectType, dirs, exts}), 'utf8')
@@ -768,6 +833,7 @@ async function handleUninstall() {
   await removeGitignoreEntry(root, '.indexer/')
   await removeRootMcpIndexer(paths.rootMcpPath)
   await removeKilocodeMcpIndexer(root)
+  await removeGeminiMcpIndexer(root)
   await removeCodexArgsIndexer(paths.codexArgsPath)
   await removeReadmeCliSection(root)
 
