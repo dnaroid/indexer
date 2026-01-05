@@ -1,0 +1,52 @@
+{
+  "name": "@dnaroid/mcp-code-indexer",
+  "version": "1.0.0",
+  "description": "Local code indexer and MCP server for AI agents - no Docker required",
+  "keywords": [
+    "mcp",
+    "mcp-server",
+    "ai",
+    "indexer",
+    "search",
+    "qdrant",
+    "ollama",
+    "vector-search",
+    "rag"
+  ],
+  "author": "Dnaroid",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/dnaroid/indexer.git"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "type": "module",
+  "bin": {
+    "indexer": "indexer.js"
+  },
+  "files": [
+    "indexer.js",
+    "lib",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "test": "node --test lib/mcp-tools.test.js lib/indexer-core.test.js tests/*.test.js",
+    "prepublishOnly": "npm test"
+  },
+  "dependencies": {
+    "@babel/parser": "^7.28.5",
+    "@babel/traverse": "^7.28.5",
+    "@modelcontextprotocol/sdk": "^1.25.1",
+    "chokidar": "^5.0.0",
+    "fast-glob": "^3.3.3",
+    "ignore": "^7.0.5",
+    "node-fetch": "^3.3.2",
+    "web-tree-sitter": "^0.26.3",
+    "zod": "^4.3.5"
+  }
+}

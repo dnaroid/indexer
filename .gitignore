@@ -1,0 +1,7 @@
+/.idea/
+/node_modules/
+/.mcp/
+.mcp.json
+.indexer/
+/.env
+build/

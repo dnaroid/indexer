@@ -1,0 +1,29 @@
+# Source control
+.git
+.gitignore
+.env
+.env.example
+
+# Build artifacts
+build/
+dist/
+
+# Tests and fixtures
+tests/
+lib/**/*.test.js
+lib/test_fixtures/
+test_fixtures/
+
+# CI/CD and config
+.github/
+.gitlab-ci.yml
+Makefile
+docker-compose.yaml
+scripts/
+AGENTS.md
+plan.md
+README_CLI.md
+
+# Logs and local state
+.indexer/
+*.log
