@@ -12,48 +12,35 @@ import {
 const require = createRequire(import.meta.url)
 const pkg = require('./package.json')
 
-import {appendFileSync} from 'fs'
-
-function debug(msg) {
-  try {
-    appendFileSync('debug-cursor.log', `[MAIN] ${new Date().toISOString()} ${msg}\n`)
-  } catch (e) {}
-}
-
 const args = process.argv.slice(2)
 const command = args.length > 0 ? args[0] : null
 const startCwd = process.cwd()
 
 // Ensure cursor is restored on exit/interrupt/error
-const exitHandler = (source) => {
-  debug(`exitHandler called from ${source}`)
+const exitHandler = () => {
   restoreTerminal()
 }
 
-process.on('exit', () => exitHandler('exit event'))
+process.on('exit', exitHandler)
 
 process.on('SIGINT', () => {
-  debug('SIGINT received')
-  exitHandler('SIGINT')
+  exitHandler()
   process.exit(130)
 })
 
 process.on('SIGTERM', () => {
-  debug('SIGTERM received')
-  exitHandler('SIGTERM')
+  exitHandler()
   process.exit(143)
 })
 
 process.on('uncaughtException', (err) => {
-  debug(`uncaughtException: ${err.message}`)
-  exitHandler('uncaughtException')
+  exitHandler()
   console.error('[indexer] Uncaught Exception:', err)
   process.exit(1)
 })
 
 process.on('unhandledRejection', (err) => {
-  debug(`unhandledRejection: ${err.message}`)
-  exitHandler('unhandledRejection')
+  exitHandler()
   console.error('[indexer] Unhandled Rejection:', err)
   process.exit(1)
 })
@@ -122,6 +109,7 @@ async function main() {
   if (!command) {
     await interactiveMenu()
     restoreTerminal()
+    process.exit(0)
     return
   }
 
@@ -173,6 +161,7 @@ async function main() {
   if (command !== 'mcp') {
     // Background check for updates (only if not running mcp server)
     // checkUpdateInBackground() // Removed as it was empty and we have sync check now
+    process.exit(0)
   }
 }
 
