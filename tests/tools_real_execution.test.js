@@ -172,9 +172,9 @@ test('Real Execution: get_file_outline (C#)', async () => {
   assert.ok(symbols.find(s => s.name === 'Player.health')) // serialized field
 })
 
-test('Real Execution: find_references (ripgrep)', async () => {
+test('Real Execution: find_usages (ripgrep)', async () => {
   // Search for 'addUser'
-  const res = await handlers.find_references({name: 'addUser'})
+  const res = await handlers.find_usages({symbol: 'addUser'})
   const refs = JSON.parse(res.content[0].text)
   
   // Should find definition and usage

@@ -35,10 +35,16 @@ test('get_file_outline returns symbols', async () => {
     assert.equal(json[0].line, 1)
 })
 
-test('find_references delegates to ripgrep', async () => {
-    const res = await handlers.find_references({name: 'MySymbol'})
+test('find_usages delegates to ripgrep', async () => {
+
+    const res = await handlers.find_usages({symbol: 'MySymbol'})
+
     const json = JSON.parse(res.content[0].text)
+
     
+
     assert.equal(json.length, 1)
+
     assert.equal(json[0].snippet, 'use MySymbol')
+
 })
