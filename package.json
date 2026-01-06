@@ -1,6 +1,6 @@
 {
   "name": "@dnaroid/mcp-code-indexer",
-  "version": "1.0.7",
+  "version": "1.0.8",
   "description": "Local code indexer and MCP server for AI agents",
   "keywords": [
     "mcp",
