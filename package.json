@@ -36,7 +36,8 @@
   },
   "scripts": {
     "test": "node --test lib/mcp-tools.test.js lib/indexer-core.test.js tests/*.test.js",
-    "prepublishOnly": "npm test"
+    "prepublishOnly": "npm test",
+    "release": "npm version minor && git push --follow-tags && npm publish"
   },
   "dependencies": {
     "@babel/parser": "^7.28.5",
