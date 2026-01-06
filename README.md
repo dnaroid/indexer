@@ -96,6 +96,16 @@ Collect coverage report:
 node --experimental-test-coverage --test lib/mcp-tools.test.js lib/indexer-core.test.js tests/*.test.js
 ```
 
+## Releasing
+
+To release a new version, use the `release` script. This will increment the minor version, create a git tag, push changes to the repository, and publish to NPM.
+
+```bash
+npm run release
+```
+
+*Note: Ensure your working directory is clean (all changes committed) before running this command.*
+
 ## License
 
 MIT
