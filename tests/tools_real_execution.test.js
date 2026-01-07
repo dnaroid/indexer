@@ -2,15 +2,15 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import fs from 'fs/promises'
 import path from 'path'
-import {createToolHandlers} from '../lib/mcp-handlers.js'
+import {createToolHandlers} from '../lib/mcp/mcp-handlers.js'
 import {
   extractSymbols,
   buildTreeText,
   runRipgrep,
   detectLanguage,
   filterReferences
-} from '../lib/mcp-tools.js'
-import {initTreeSitter} from '../lib/tree-sitter.js'
+} from '../lib/mcp/mcp-tools.js'
+import {initTreeSitter} from '../lib/utils/tree-sitter.js'
 
 // Setup a real playground directory
 const PLAYGROUND_DIR = path.resolve(process.cwd(), 'tests_playground')

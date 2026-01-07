@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import {createToolHandlers} from '../lib/mcp-handlers.js'
+import {createToolHandlers} from '../lib/mcp/mcp-handlers.js'
 
 // Mock dependencies
 const mockDeps = {

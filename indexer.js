@@ -3,12 +3,12 @@
 import {createRequire} from 'module'
 import {
   printBanner, restoreTerminal, printHelp, pickOption, fail
-} from './lib/cli-ui.js'
+} from './lib/cli/cli-ui.js'
 import {
   handleInit, handleStatus, handleCleanIndex, handleListCollections, handleDeleteCollection,
   handlePruneAll, handleMcp, handleUninstall, handleLogs, checkAndAutoUpdate,
   isDaemonRunning, handleListProjects, handleDeleteProject, handleTestCommand
-} from './lib/cli-actions.js'
+} from './lib/cli/cli-actions.js'
 
 const require = createRequire(import.meta.url)
 const pkg = require('./package.json')

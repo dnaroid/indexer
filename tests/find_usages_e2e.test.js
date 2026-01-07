@@ -2,9 +2,9 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import path from 'path'
 import fs from 'fs/promises'
-import { initTreeSitter } from '../lib/tree-sitter.js'
-import { extractSymbols, filterReferences } from '../lib/mcp-tools.js'
-import { createToolHandlers } from '../lib/mcp-handlers.js'
+import { initTreeSitter } from '../lib/utils/tree-sitter.js'
+import { extractSymbols, filterReferences } from '../lib/mcp/mcp-tools.js'
+import { createToolHandlers } from '../lib/mcp/mcp-handlers.js'
 
 // Mock dependencies for MCP handlers
 const mockDeps = {

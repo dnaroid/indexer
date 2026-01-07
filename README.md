@@ -102,6 +102,48 @@ The indexer runs as a **singleton background service** (daemon).
 
 Global config is stored in `~/.indexer/config.json`. Logs are in `~/.indexer/log.txt`.
 
+### Modular Architecture
+
+The codebase is organized into modular components with clear responsibilities, grouped by functional layers:
+
+**CLI Layer** (`lib/cli/`):
+- `cli-commands.js` - Core CLI command handlers
+- `cli-actions.js` - CLI action implementations
+- `cli-config.js` - CLI configuration utilities
+- `cli-ui.js` - CLI user interface helpers
+- `daemon-manager.js` - Daemon process management
+
+**Service Layer** (`lib/services/`):
+- `service-lifecycle.js` - Service lifecycle management (start/stop/shutdown)
+- `inactivity-manager.js` - Activity tracking and inactivity timers
+- `project-watcher.js` - File watching and project synchronization
+- `mcp-service.js` - MCP server creation and request handling
+- `indexer-service.js` - Main indexer service coordinator
+
+**Core Layer** (`lib/core/`):
+- `file-indexer.js` - File indexing, embeddings, and chunking
+- `qdrant-client.js` - All Qdrant database operations
+- `file-filters.js` - File filtering and ignore patterns
+- `indexer-core.js` - Core indexing operations coordinator
+- `project-detector.js` - Project type detection
+
+**MCP Layer** (`lib/mcp/`):
+- `mcp-server.js` - MCP server implementation
+- `mcp-tools.js` - MCP tool implementations
+- `mcp-handlers.js` - MCP request handlers
+- `mcp-test-runner.js` - MCP tool testing utilities
+
+**Managers Layer** (`lib/managers/`):
+- `project-manager.js` - Project registration and management
+- `collection-manager.js` - Qdrant collection operations
+
+**Utils Layer** (`lib/utils/`):
+- `config-global.js` - Global configuration management
+- `snapshot-manager.js` - File system snapshot management
+- `tree-sitter.js` - Tree-sitter parser integration
+- `ast-js.js` - JavaScript AST parser
+- `system-check.js` - System requirements checker
+
 ### Automatic Project Management
 
 The daemon monitors the global configuration file and automatically:

@@ -2,15 +2,15 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import fs from 'fs/promises'
 import path from 'path'
-import { createToolHandlers } from '../lib/mcp-handlers.js'
-import { initTreeSitter } from '../lib/tree-sitter.js'
-import { listProjectFiles } from '../lib/indexer-core.js'
-import { 
-  buildTreeText, 
-  extractSymbols, 
-  filterReferences, 
-  runRipgrep 
-} from '../lib/mcp-tools.js'
+import { createToolHandlers } from '../lib/mcp/mcp-handlers.js'
+import { initTreeSitter } from '../lib/utils/tree-sitter.js'
+import { listProjectFiles } from '../lib/core/indexer-core.js'
+import {
+  buildTreeText,
+  extractSymbols,
+  filterReferences,
+  runRipgrep
+} from '../lib/mcp/mcp-tools.js'
 
 // Mock dependencies using real implementations where possible
 const deps = {

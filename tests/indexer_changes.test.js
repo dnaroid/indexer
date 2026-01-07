@@ -7,7 +7,7 @@ import {
     indexFile,
     setFetch,
     resetConfigCache
-} from '../lib/indexer-core.js'
+} from '../lib/core/indexer-core.js'
 
 // --- Mock Infrastructure ---
 
