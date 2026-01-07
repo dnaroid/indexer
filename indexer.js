@@ -7,7 +7,7 @@ import {
 import {
   handleInit, handleStatus, handleCleanIndex, handleListCollections, handleDeleteCollection,
   handlePruneAll, handleMcp, handleUninstall, handleUpdate, checkAndAutoUpdate, handleLogs,
-  isDaemonRunning, handleStartDaemon
+  isDaemonRunning
 } from './lib/cli-actions.js'
 
 const require = createRequire(import.meta.url)
@@ -67,12 +67,8 @@ async function interactiveMenu() {
       {label: 'init        - create .indexer/ config', value: 'init'},
       {label: 'index       - force index rebuild (was clean)', value: 'index'},
       {label: 'status      - show status', value: 'status'},
-      {label: 'start-daemon - start the background indexing daemon', value: 'start-daemon'},
+      {label: 'logs        - tail daemon logs', value: 'logs'},
     ]
-
-    if (daemonRunning) {
-      options.push({label: 'logs        - tail daemon logs', value: 'logs'})
-    }
 
     options.push(
       {label: 'collections - list global Qdrant collections', value: 'collections'},
@@ -102,9 +98,6 @@ async function interactiveMenu() {
     case 'index':
     case 'clean':
       await handleCleanIndex(startCwd)
-      break
-    case 'start-daemon':
-      await handleStartDaemon(startCwd)
       break
     case 'logs':
       await handleLogs()
@@ -171,9 +164,6 @@ async function main() {
     break
   case 'status':
     await handleStatus(startCwd)
-    break
-  case 'start-daemon':
-    await handleStartDaemon(startCwd)
     break
   case 'collections':
   case 'list':
