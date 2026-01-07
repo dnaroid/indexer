@@ -6,7 +6,7 @@ import {
 } from './lib/cli-ui.js'
 import {
   handleInit, handleStatus, handleCleanIndex, handleListCollections, handleDeleteCollection,
-  handlePruneAll, handleMcp, handleUninstall, handleUpdate, checkAndAutoUpdate, handleLogs,
+  handlePruneAll, handleMcp, handleUninstall, handleLogs, checkAndAutoUpdate,
   isDaemonRunning
 } from './lib/cli-actions.js'
 
@@ -73,7 +73,6 @@ async function interactiveMenu() {
     options.push(
       {label: 'collections - list global Qdrant collections', value: 'collections'},
       {label: 'delete      - delete collections (select or all)', value: 'delete'},
-      {label: 'update      - update CLI to latest version', value: 'update'},
       {label: 'uninstall   - remove project from index & config', value: 'uninstall'},
       {label: 'quit', value: 'exit'}
     )
@@ -107,9 +106,6 @@ async function interactiveMenu() {
       break
     case 'delete':
       await handleDeleteCollection()
-      break
-    case 'update':
-      await handleUpdate()
       break
     case 'uninstall':
       await handleUninstall(startCwd)
@@ -158,9 +154,6 @@ async function main() {
     break
   case 'uninstall':
     await handleUninstall(startCwd)
-    break
-  case 'update':
-    await handleUpdate()
     break
   case 'status':
     await handleStatus(startCwd)
