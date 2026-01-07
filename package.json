@@ -46,7 +46,6 @@
     "chokidar": "^5.0.0",
     "fast-glob": "^3.3.3",
     "ignore": "^7.0.5",
-    "node-fetch": "^3.3.2",
     "web-tree-sitter": "^0.26.3",
     "zod": "^4.3.5"
   }
