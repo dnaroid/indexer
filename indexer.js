@@ -6,14 +6,28 @@ import {
 } from './lib/cli-ui.js'
 import {
   handleInit, handleStatus, handleCleanIndex, handleListCollections, handleDeleteCollection,
-  handlePruneAll, handleMcp, handleUninstall, handleUpdate, checkAndAutoUpdate
+  handlePruneAll, handleMcp, handleUninstall, handleUpdate, checkAndAutoUpdate, handleLogs,
+  isDaemonRunning, handleStartDaemon
 } from './lib/cli-actions.js'
 
 const require = createRequire(import.meta.url)
 const pkg = require('./package.json')
 
 const args = process.argv.slice(2)
-const command = args.length > 0 ? args[0] : null
+let command = null
+let projectPathArg = null
+
+const cleanArgs = []
+for (const arg of args) {
+  if (arg.startsWith('--project=')) {
+    projectPathArg = arg.split('=')[1]
+  } else if (!command) {
+    command = arg
+  } else {
+    cleanArgs.push(arg)
+  }
+}
+
 const startCwd = process.cwd()
 
 // Ensure cursor is restored on exit/interrupt/error
@@ -46,18 +60,28 @@ process.on('unhandledRejection', (err) => {
 })
 
 async function interactiveMenu() {
-  const options = [
-    {label: 'init        - create .indexer/ config', value: 'init'},
-    {label: 'clean       - drop & rebuild index (alias: clear)', value: 'clean'},
-    {label: 'status      - show status', value: 'status'},
-    {label: 'collections - list global Qdrant collections', value: 'collections'},
-    {label: 'delete      - delete collections (select or all)', value: 'delete'},
-    {label: 'update      - update CLI to latest version', value: 'update'},
-    {label: 'uninstall   - remove .indexer/', value: 'uninstall'},
-    {label: 'quit', value: 'exit'}
-  ]
-
   while (true) {
+    const daemonRunning = await isDaemonRunning()
+    
+    const options = [
+      {label: 'init        - create .indexer/ config', value: 'init'},
+      {label: 'index       - force index rebuild (was clean)', value: 'index'},
+      {label: 'status      - show status', value: 'status'},
+      {label: 'start-daemon - start the background indexing daemon', value: 'start-daemon'},
+    ]
+
+    if (daemonRunning) {
+      options.push({label: 'logs        - tail daemon logs', value: 'logs'})
+    }
+
+    options.push(
+      {label: 'collections - list global Qdrant collections', value: 'collections'},
+      {label: 'delete      - delete collections (select or all)', value: 'delete'},
+      {label: 'update      - update CLI to latest version', value: 'update'},
+      {label: 'uninstall   - remove project from index & config', value: 'uninstall'},
+      {label: 'quit', value: 'exit'}
+    )
+
     const choice = await pickOption(options)
     if (!choice || choice === 'exit') {
       return
@@ -68,13 +92,22 @@ async function interactiveMenu() {
     switch(choice) {
     case 'init':
       await handleInit(startCwd)
+        .catch((e) => {
+          if (e.message !== 'INDEXER_ALREADY_EXISTS') throw e
+        })
       break
     case 'status':
       await handleStatus(startCwd)
       break
+    case 'index':
     case 'clean':
-    case 'clear':
       await handleCleanIndex(startCwd)
+      break
+    case 'start-daemon':
+      await handleStartDaemon(startCwd)
+      break
+    case 'logs':
+      await handleLogs()
       break
     case 'collections':
       await handleListCollections()
@@ -105,6 +138,8 @@ async function main() {
   await checkAndAutoUpdate(command)
 
   if (!command) {
+    await handleStatus(startCwd)
+    console.log('')
     await interactiveMenu()
     restoreTerminal()
     process.exit(0)
@@ -114,10 +149,19 @@ async function main() {
   switch(command) {
   case 'init':
     await handleInit(startCwd)
+      .catch((e) => {
+        if (e.message === 'INDEXER_ALREADY_EXISTS') process.exit(1)
+        throw e
+      })
     break
+  case 'index':
   case 'clean':
   case 'clear':
     await handleCleanIndex(startCwd)
+    break
+  case 'logs':
+  case 'log':
+    await handleLogs()
     break
   case 'uninstall':
     await handleUninstall(startCwd)
@@ -127,6 +171,9 @@ async function main() {
     break
   case 'status':
     await handleStatus(startCwd)
+    break
+  case 'start-daemon':
+    await handleStartDaemon(startCwd)
     break
   case 'collections':
   case 'list':
@@ -141,7 +188,7 @@ async function main() {
     await handlePruneAll()
     break
   case 'mcp':
-    await handleMcp(args, startCwd)
+    await handleMcp(cleanArgs, startCwd, projectPathArg)
     break
   case 'help':
   case '--help':
@@ -156,9 +203,7 @@ async function main() {
     fail(`Unknown command: ${command}`)
   }
 
-  if (command !== 'mcp') {
-    // Background check for updates (only if not running mcp server)
-    // checkUpdateInBackground() // Removed as it was empty and we have sync check now
+  if (command !== 'mcp' && command !== 'logs') {
     process.exit(0)
   }
 }

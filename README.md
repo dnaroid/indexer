@@ -1,7 +1,6 @@
 # AI Indexer
 
-Local code indexer and MCP server for AI agents. It provides semantic search, symbol navigation, and project exploration
-tools without requiring Docker or cloud services.
+Local code indexer and MCP server for AI agents. It provides semantic search, symbol navigation, and project exploration tools without requiring Docker or cloud services.
 
 ## Quick Start
 
@@ -27,6 +26,7 @@ tools without requiring Docker or cloud services.
 - **File Outlining:** Get a high-level view of any file's structure (JS/TS, Python, Go, Rust, C#).
 - **Project Tree:** View the recursive structure of your project, respecting `.gitignore`.
 - **Reference Finding:** Fast, exact textual search for symbol occurrences using `ripgrep`.
+- **Background Indexing:** A singleton daemon monitors all initialized projects and keeps the index up-to-date automatically.
 
 ## Prerequisites & Installation
 
@@ -56,7 +56,7 @@ Provides local embedding models. The MCP server can auto-start it if found in `P
   After installing, make sure to pull the embedding model once:
   ```bash
   ollama serve &                # Start server (if not running)
-  ollama pull nomic-embed-text  # Download model
+  ollama pull unclemusclez/jina-embeddings-v2-base-code  # Download model
   ```
 
 ### 3. Qdrant (Required)
@@ -78,9 +78,28 @@ docker run -d -p 6333:6333 -v qdrant_data:/qdrant/storage qdrant/qdrant
 
 - `search_codebase`: Conceptual search (e.g., "how is auth handled?").
 - `search_symbols`: Locate specific class or method definitions.
-- `get_file_outline`: See classes and methods in a file without reading full code.
+- `get_file_outline`: See classes and methods in a file without reading all its code.
 - `get_project_structure`: Recursive visual file tree.
 - `find_references`: Find all places where a symbol is used.
+
+## CLI Commands
+
+- `indexer init`: Initialize the current project. Adds it to the global daemon's watch list and creates `.indexer/`.
+- `indexer status`: Show status of the current project and services (Qdrant, Ollama).
+- `indexer index`: Force a full re-index of the current project (formerly `clean`).
+- `indexer logs`: Tail the logs of the background daemon process.
+- `indexer collections`: List all vector collections in Qdrant.
+- `indexer uninstall`: Remove the current project from the global watch list and delete its index.
+
+## Architecture
+
+The indexer runs as a **singleton background service** (daemon).
+- **Single Process:** One Node.js process manages file watching and indexing for ALL your initialized projects.
+- **Resource Efficient:** Prevents multiple MCP servers from eating up CPU/RAM.
+- **Instant Connect:** New IDE windows connect to the running daemon instantly.
+- **Offline Sync:** If the daemon was stopped, it automatically resyncs changed files upon restart.
+
+Global config is stored in `~/.indexer.cfg`. Logs are in `~/.indexer/logs/`.
 
 ## Development
 
@@ -89,22 +108,6 @@ Run tests to ensure everything is working correctly:
 ```bash
 npm test
 ```
-
-Collect coverage report:
-
-```bash
-node --experimental-test-coverage --test lib/mcp-tools.test.js lib/indexer-core.test.js tests/*.test.js
-```
-
-## Releasing
-
-To release a new version, use the `release` script. This will increment the minor version, create a git tag, push changes to the repository, and publish to NPM.
-
-```bash
-npm run release
-```
-
-*Note: Ensure your working directory is clean (all changes committed) before running this command.*
 
 ## License
 

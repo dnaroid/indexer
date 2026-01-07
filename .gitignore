@@ -4,6 +4,6 @@
 .mcp.json
 /.env
 build/
-.indexer/
 /.gemini/
 /plans/
+.indexer/
