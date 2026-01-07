@@ -7,7 +7,7 @@ import {
 import {
   handleInit, handleStatus, handleCleanIndex, handleListCollections, handleDeleteCollection,
   handlePruneAll, handleMcp, handleUninstall, handleLogs, checkAndAutoUpdate,
-  isDaemonRunning, handleListProjects, handleDeleteProject
+  isDaemonRunning, handleListProjects, handleDeleteProject, handleTestCommand
 } from './lib/cli-actions.js'
 
 const require = createRequire(import.meta.url)
@@ -170,6 +170,9 @@ async function main() {
     break
   case 'prune':
     await handlePruneAll()
+    break
+  case 'test':
+    await handleTestCommand(startCwd, cleanArgs[0])
     break
   case 'mcp':
     await handleMcp(cleanArgs, startCwd, projectPathArg)
