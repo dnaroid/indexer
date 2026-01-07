@@ -61,8 +61,8 @@ process.on('unhandledRejection', (err) => {
 
 async function interactiveMenu() {
   while (true) {
-    const daemonRunning = await isDaemonRunning()
-    
+    const daemonRunning = await isDaemonRunning(startCwd)
+
     const options = [
       {label: 'init        - create .indexer/ config', value: 'init'},
       {label: 'index       - force index rebuild (was clean)', value: 'index'},
