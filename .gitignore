@@ -6,8 +6,8 @@
 build/
 /.gemini/
 /plans/
-.indexer/
 AGENTS.md
 CLAUDE.md
 /.claude/
 .codex-cmd-args
+.indexer/
