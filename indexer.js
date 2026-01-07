@@ -7,7 +7,7 @@ import {
 import {
   handleInit, handleStatus, handleCleanIndex, handleListCollections, handleDeleteCollection,
   handlePruneAll, handleMcp, handleUninstall, handleLogs, checkAndAutoUpdate,
-  isDaemonRunning
+  isDaemonRunning, handleListProjects, handleDeleteProject
 } from './lib/cli-actions.js'
 
 const require = createRequire(import.meta.url)
@@ -71,8 +71,8 @@ async function interactiveMenu() {
     ]
 
     options.push(
-      {label: 'collections - list global Qdrant collections', value: 'collections'},
-      {label: 'delete      - delete collections (select or all)', value: 'delete'},
+      {label: 'projects    - list tracked projects', value: 'projects'},
+      {label: 'delete      - delete project (select or by number)', value: 'delete'},
       {label: 'uninstall   - remove project from index & config', value: 'uninstall'},
       {label: 'quit', value: 'exit'}
     )
@@ -101,11 +101,11 @@ async function interactiveMenu() {
     case 'logs':
       await handleLogs()
       break
-    case 'collections':
-      await handleListCollections()
+    case 'projects':
+      await handleListProjects()
       break
     case 'delete':
-      await handleDeleteCollection()
+      await handleDeleteProject()
       break
     case 'uninstall':
       await handleUninstall(startCwd)
@@ -158,14 +158,15 @@ async function main() {
   case 'status':
     await handleStatus(startCwd)
     break
+  case 'projects':
   case 'collections':
   case 'list':
   case 'ls':
-    await handleListCollections()
+    await handleListProjects()
     break
   case 'delete':
   case 'rm':
-    await handleDeleteCollection(args[1])
+    await handleDeleteProject(args[1])
     break
   case 'prune':
     await handlePruneAll()
