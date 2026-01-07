@@ -79,8 +79,8 @@ import fg from 'fast-glob'
 const realDeps = {
   extractSymbols,
   buildTreeText,
-  runRipgrep,
-  filterReferences,
+  runRipgrep: (pattern) => runRipgrep(pattern, PLAYGROUND_DIR),
+  filterReferences: (results) => filterReferences(results, PLAYGROUND_DIR, (p) => fs.readFile(path.resolve(PLAYGROUND_DIR, p), 'utf8')),
   listProjectFiles: async () => {
     return fg('**/*', { cwd: PLAYGROUND_DIR })
   },
