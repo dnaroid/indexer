@@ -7,3 +7,5 @@ build/
 /.gemini/
 /plans/
 .indexer/
+AGENTS.md
+CLAUDE.md
