@@ -24,7 +24,7 @@ Local code indexer and MCP server for AI agents. It provides semantic search, sy
 - **Semantic Search:** Find code by meaning using local embeddings (via Ollama).
 - **Symbol Navigation:** Instantly jump to definitions of classes, methods, or Unity-specific components.
 - **File Outlining:** Get a high-level view of any file's structure (JS/TS, Python, Go, Rust, C#).
-- **Project Tree:** View the recursive structure of your project, respecting `.gitignore`.
+- **Project Tree:** View recursive structure of your project, respecting `.gitignore`.
 - **Reference Finding:** Fast, exact textual search for symbol occurrences using `ripgrep`.
 - **Background Indexing:** A singleton daemon monitors all initialized projects and keeps the index up-to-date automatically.
 
@@ -98,8 +98,18 @@ The indexer runs as a **singleton background service** (daemon).
 - **Resource Efficient:** Prevents multiple MCP servers from eating up CPU/RAM.
 - **Instant Connect:** New IDE windows connect to the running daemon instantly.
 - **Offline Sync:** If the daemon was stopped, it automatically resyncs changed files upon restart.
+- **Auto-Config Sync:** The daemon automatically detects changes to `~/.indexer/config.json` and adds/removes projects accordingly.
 
-Global config is stored in `~/.indexer.cfg`. Logs are in `~/.indexer/logs/`.
+Global config is stored in `~/.indexer/config.json`. Logs are in `~/.indexer/log.txt`.
+
+### Automatic Project Management
+
+The daemon monitors the global configuration file and automatically:
+- **Registers new projects** when they are added to `config.json`
+- **Unregisters projects** when they are removed from `config.json`
+- **Handles errors gracefully** - if `config.json` contains invalid JSON, the error is logged but the daemon continues running without modifying projects
+
+This means you can add or remove projects by editing `~/.indexer/config.json` directly, and the daemon will automatically pick up the changes without requiring a restart.
 
 ## Development
 
