@@ -9,3 +9,5 @@ build/
 .indexer/
 AGENTS.md
 CLAUDE.md
+/.claude/
+.codex-cmd-args

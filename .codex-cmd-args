@@ -1,1 +1,0 @@
--c mcp_servers.indexer.command="indexer" -c mcp_servers.indexer.args='["mcp","--cwd=/Volumes/128GBSSD/Projects/ai-indexer"]'
