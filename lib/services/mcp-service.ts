@@ -163,23 +163,23 @@ function createMcpHandlers() {
   return {
     search_codebase: async (args: any) => {
       updateActivity()
-      return executeQuery(args)
+      return executeQuery({ collectionId: args.collectionId, tool: 'search_codebase', args })
     },
     search_symbols: async (args: any) => {
       updateActivity()
-      return executeQuery(args)
+      return executeQuery({ collectionId: args.collectionId, tool: 'search_symbols', args })
     },
     get_file_outline: async (args: any) => {
       updateActivity()
-      return executeQuery(args)
+      return executeQuery({ collectionId: args.collectionId, tool: 'get_file_outline', args })
     },
     get_project_structure: async (args: any) => {
       updateActivity()
-      return executeQuery(args)
+      return executeQuery({ collectionId: args.collectionId, tool: 'get_project_structure', args })
     },
     find_usages: async (args: any) => {
       updateActivity()
-      return executeQuery(args)
+      return executeQuery({ collectionId: args.collectionId, tool: 'find_usages', args })
     }
   }
 }
