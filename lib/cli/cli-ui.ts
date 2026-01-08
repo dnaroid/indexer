@@ -2,10 +2,14 @@ import readline from 'readline'
 import { createInterface } from 'readline/promises'
 import { stdin as input, stdout as output } from 'node:process'
 import { writeSync } from 'fs'
-import { createRequire } from 'module'
+import fs from 'fs'
+import path from 'path'
+import { fileURLToPath } from 'url'
 
-const require = createRequire(import.meta.url)
-const pkg = require('../package.json')
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
+const pkgPath = path.resolve(__dirname, '../../../package.json')
+const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf-8'))
 
 let terminalRestored = false
 

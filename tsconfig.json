@@ -24,6 +24,7 @@
     "checkJs": false
   },
   "include": [
+    "indexer.ts",
     "lib/**/*",
     "tests/**/*"
   ],

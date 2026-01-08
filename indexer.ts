@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 
-import { createRequire } from 'module'
+import { fileURLToPath } from 'url'
+import path from 'path'
+import fs from 'fs'
 import {
   printBanner,
   restoreTerminal,
@@ -22,8 +24,10 @@ import {
   handleTestCommand
 } from './lib/cli/cli-actions.js'
 
-const require = createRequire(import.meta.url)
-const pkg = require('./package.json')
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
+const pkgPath = path.resolve(__dirname, '../package.json')
+const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf-8'))
 
 const args = process.argv.slice(2)
 let command: string | null = null

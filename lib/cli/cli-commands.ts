@@ -2,7 +2,7 @@ import fs from 'fs/promises'
 import fsSync from 'fs'
 import path from 'path'
 import { spawn } from 'child_process'
-import { createRequire } from 'module'
+import { fileURLToPath } from 'url'
 
 import { fail, log, warn } from './cli-ui.js'
 import {
@@ -38,8 +38,10 @@ import {
 import { isDaemonRunning, stopDaemon } from './daemon-manager.js'
 import { isQdrantUp, isOllamaUp, countIndexed } from '../managers/collection-manager.js'
 
-const require = createRequire(import.meta.url)
-const pkg = require('../../package.json')
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
+const pkgPath = path.resolve(__dirname, '../../../package.json')
+const pkg = JSON.parse(fsSync.readFileSync(pkgPath, 'utf-8'))
 
 export async function ensureInitialized(startCwd: string) {
   const root = await findProjectRoot(startCwd)
