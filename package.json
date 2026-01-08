@@ -24,20 +24,22 @@
   },
   "type": "module",
   "bin": {
-    "indexer": "indexer.js"
+    "indexer": "build/indexer.js"
   },
   "files": [
-    "indexer.js",
-    "lib",
+    "build",
     "README.md"
   ],
   "engines": {
     "node": ">=18"
   },
   "scripts": {
-    "test": "node --test lib/mcp/mcp-tools.test.js lib/core/indexer-core.test.js lib/core/project-detector.test.js lib/mcp/mcp-tools.test.js lib/utils/snapshot-manager.test.js tests/*.test.js",
-    "prepublishOnly": "npm test",
-    "release": "npm version minor && git push --follow-tags && npm publish"
+    "build": "tsc && mkdir -p build/lib/utils/grammars && cp lib/utils/grammars/*.wasm build/lib/utils/grammars/",
+    "watch": "tsc --watch",
+    "test": "npm run build && node --test build/lib/core/indexer-core.test.js build/lib/core/project-detector.test.js build/lib/mcp/mcp-tools.test.js build/lib/utils/snapshot-manager.test.js build/tests/find_usages_e2e.test.js build/tests/indexer_changes.test.js build/tests/live_search.test.js build/tests/tools_handlers.test.js build/tests/tools_real_execution.test.js",
+    "prepublishOnly": "npm run build && npm test",
+    "release": "npm version minor && git push --follow-tags && npm publish",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@babel/parser": "^7.28.5",
@@ -46,7 +48,14 @@
     "chokidar": "^5.0.0",
     "fast-glob": "^3.3.3",
     "ignore": "^7.0.5",
+    "minimatch": "^10.1.1",
     "web-tree-sitter": "^0.26.3",
     "zod": "^4.3.5"
+  },
+  "devDependencies": {
+    "@types/babel__traverse": "^7.28.0",
+    "@types/micromatch": "^4.0.10",
+    "@types/node": "^20.11.0",
+    "typescript": "^5.3.3"
   }
 }

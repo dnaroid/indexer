@@ -1,13 +1,32 @@
+# IDE
 /.idea/
+/.vscode/
+
+# Dependencies
 /node_modules/
+
+# MCP
 /.mcp/
 .mcp.json
+
+# Environment
 /.env
-build/
+
+# Build output
+/build/
+/dist/
+*.tsbuildinfo
+
+# AI configs
 /.gemini/
+/.claude/
+.claude/
+.codex-cmd-args
+
+# Local
 /plans/
+.indexer/
+
+# Documentation
 AGENTS.md
 CLAUDE.md
-/.claude/
-.codex-cmd-args
-.indexer/
