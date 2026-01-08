@@ -1,5 +1,8 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
+import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js'
+import { randomUUID } from 'crypto'
+import http from 'http'
 import { z } from 'zod'
 import { updateActivity } from './inactivity-manager.js'
 import { createToolHandlers } from '../mcp/mcp-handlers.js'
@@ -291,4 +294,80 @@ export async function startMcpServer(): Promise<void> {
   const transport = new StdioServerTransport()
   await server.connect(transport)
   console.log('[mcp-service] MCP server connected via stdio')
+}
+
+/**
+ * Start MCP server via HTTP for daemon mode (multi-client support)
+ * @param {number} port - Port number to listen on
+ * @returns {Promise<void>}
+ */
+export async function startMcpHttpServer(port: number): Promise<void> {
+  console.log('[mcp-service] Starting HTTP MCP server...')
+  const server = createMcpServer()
+
+  // Use stateless mode - no session ID tracking
+  // This allows multiple independent clients to connect without session conflicts
+  const transport = new StreamableHTTPServerTransport({
+    sessionIdGenerator: undefined, // Stateless mode
+    onsessioninitialized: (sessionId) => {
+      console.log(`[mcp-service] Client connected`)
+      updateActivity()
+    },
+    onsessionclosed: (sessionId) => {
+      console.log(`[mcp-service] Client disconnected`)
+    }
+  })
+
+  const httpServer = http.createServer((req, res) => {
+    // Handle both GET (SSE) and POST (JSON) requests
+    if (req.url === '/mcp' || req.url === '/sse') {
+      if (req.method === 'POST') {
+        let body = ''
+        req.on('data', chunk => { body += chunk })
+        req.on('end', async () => {
+          try {
+            updateActivity()
+            const parsed = JSON.parse(body)
+            await transport.handleRequest(req, res, parsed)
+          } catch (err: any) {
+            console.error('[mcp-service] Error handling request:', err)
+            if (!res.headersSent) {
+              res.writeHead(500, { 'Content-Type': 'application/json' })
+              res.end(JSON.stringify({ error: err.message }))
+            }
+          }
+        })
+      } else if (req.method === 'GET') {
+        // Handle SSE GET requests
+        try {
+          updateActivity()
+          transport.handleRequest(req, res).catch(err => {
+            console.error('[mcp-service] Error handling GET request:', err)
+          })
+        } catch (err: any) {
+          console.error('[mcp-service] Error handling GET request:', err)
+          if (!res.headersSent) {
+            res.writeHead(500)
+            res.end()
+          }
+        }
+      } else {
+        res.writeHead(405)
+        res.end()
+      }
+    } else {
+      res.writeHead(404)
+      res.end()
+    }
+  })
+
+  await new Promise<void>((resolve) => {
+    httpServer.listen(port, '127.0.0.1', () => {
+      console.log(`[mcp-service] HTTP server listening on http://127.0.0.1:${port}`)
+      resolve()
+    })
+  })
+
+  await server.connect(transport)
+  console.log('[mcp-service] MCP server connected via HTTP')
 }

@@ -474,7 +474,7 @@ const COLLECTION_ID = '${collectionId}'
 const PROJECT_ROOT = '${paths.root}'
 const DAEMON_PID_FILE = path.join(process.env.HOME || process.env.USERPROFILE, '.indexer', 'daemon.pid')
 const DAEMON_CMD = 'node'
-const DAEMON_SCRIPT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'lib', 'indexer-service.js')
+const DAEMON_SCRIPT = path.join(PROJECT_ROOT, 'build', 'lib', 'services', 'indexer-service.js')
 
 // Check if daemon is running
 async function isDaemonRunning() {
@@ -484,7 +484,7 @@ async function isDaemonRunning() {
     // Signal 0 checks if process exists
     process.kill(pid, 0)
     return true
-  } catch (e: any) {
+  } catch (e) {
     return false
   }
 }
@@ -517,7 +517,7 @@ async function startDaemon() {
 }
 
 // Inject collectionId into MCP JSON-RPC request
-function injectCollectionId(data: string) {
+function injectCollectionId(data) {
   try {
     const parsed = JSON.parse(data)
     
@@ -528,7 +528,7 @@ function injectCollectionId(data: string) {
     }
     
     return data
-  } catch (e: any) {
+  } catch (e) {
     // If not valid JSON, return as-is
     return data
   }
@@ -549,7 +549,7 @@ async function main() {
   })
   
   // Handle daemon exit
-  daemon.on('exit', (code: number | null, signal: string | null) => {
+  daemon.on('exit', (code, signal) => {
     console.error(\`[MCP Proxy] Daemon exited with code \${code}, signal \${signal}\`)
     process.exit(code || 1)
   })
@@ -562,7 +562,7 @@ async function main() {
   // Create transform stream to inject collectionId
   const Transform = (await import('stream')).Transform
   const transformStream = new Transform({
-    transform(chunk: Buffer, encoding: BufferEncoding, callback: any) {
+    transform(chunk, encoding, callback) {
       const modified = injectCollectionId(chunk.toString())
       callback(null, modified)
     }

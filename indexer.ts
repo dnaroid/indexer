@@ -11,6 +11,11 @@ import {
   fail
 } from './lib/cli/cli-ui.js'
 import {
+  findProjectRoot,
+  getPaths,
+  pathExists
+} from './lib/cli/cli-config.js'
+import {
   handleInit,
   handleStatus,
   handleCleanIndex,
@@ -82,19 +87,32 @@ interface CliOption {
 
 async function interactiveMenu(): Promise<void> {
   while (true) {
-    const options: CliOption[] = [
-      { label: 'init        - create .indexer/ config', value: 'init' },
-      { label: 'index       - force index rebuild (was clean)', value: 'index' },
-      { label: 'status      - show status', value: 'status' },
-      { label: 'logs        - tail daemon logs', value: 'logs' }
-    ]
+    const root = await findProjectRoot(startCwd)
+    const paths = getPaths(root)
+    const isInstalled = await pathExists(paths.dotDir)
 
-    options.push(
-      { label: 'projects    - list tracked projects', value: 'projects' },
-      { label: 'delete      - delete project (select or by number)', value: 'delete' },
-      { label: 'uninstall   - remove project from index & config', value: 'uninstall' },
-      { label: 'quit', value: 'exit' }
-    )
+    const options: CliOption[] = []
+
+    if (!isInstalled) {
+      options.push({ label: 'init        - create .indexer/ config', value: 'init' })
+    }
+
+    options.push({ label: 'status      - show status', value: 'status' })
+    options.push({ label: 'logs        - tail daemon logs', value: 'logs' })
+
+    if (isInstalled) {
+      options.push({ label: 'index       - force index rebuild', value: 'index' })
+    }
+
+    options.push({ label: 'projects    - list tracked projects', value: 'projects' })
+    options.push({ label: 'delete      - delete project (select or by number)', value: 'delete' })
+
+    if (isInstalled) {
+      options.push({ label: 'uninstall   - remove project from index & config', value: 'uninstall' })
+      options.push({ label: 'test        - run MCP tool tests', value: 'test' })
+    }
+
+    options.push({ label: 'quit', value: 'exit' })
 
     const choice = await pickOption(options)
     if (!choice || choice === 'exit') {
@@ -127,6 +145,21 @@ async function interactiveMenu(): Promise<void> {
         break
       case 'uninstall':
         await handleUninstall(startCwd)
+        break
+      case 'test':
+        const testOptions: CliOption[] = [
+          { label: 'search_codebase', value: 'search_codebase' },
+          { label: 'search_symbols', value: 'search_symbols' },
+          { label: 'get_file_outline', value: 'get_file_outline' },
+          { label: 'get_project_structure', value: 'get_project_structure' },
+          { label: 'find_usages', value: 'find_usages' },
+          { label: 'all', value: 'all' },
+          { label: 'back', value: 'back' }
+        ]
+        const tool = await pickOption(testOptions)
+        if (tool && tool !== 'back' && tool !== 'exit') {
+          await handleTestCommand(startCwd, tool)
+        }
         break
       default:
         break

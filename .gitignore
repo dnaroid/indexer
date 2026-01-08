@@ -24,11 +24,12 @@
 .codex-cmd-args
 
 # Local
-/plans/
+/.plans/
 
 # Documentation
 AGENTS.md
 CLAUDE.md
 GEMINI.md
 /AGENTS/
+.geminiignore
 .indexer/

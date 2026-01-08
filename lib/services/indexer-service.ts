@@ -1,13 +1,25 @@
 import {initTreeSitter} from '../utils/tree-sitter.js'
-import {loadGlobalConfig} from '../utils/config-global.js'
+import {loadGlobalConfig, writeDaemonPortFile} from '../utils/config-global.js'
 import {log} from '../cli/cli-ui.js'
 import {registerProject} from './project-watcher.js'
 import {startHeartbeat, startInactivityTimer, stopAllTimers} from './inactivity-manager.js'
 import {gracefulShutdown, isAnotherInstanceRunning, setupSignalHandlers, writePidFile} from './service-lifecycle.js'
-import {startMcpServer} from './mcp-service.js'
+import {startMcpServer, startMcpHttpServer} from './mcp-service.js'
 
-// Mode flag
+// Mode flags
 const MCP_MODE = process.argv.includes('--mcp')
+const MCP_HTTP_MODE = process.argv.includes('--mcp-http')
+const DEFAULT_MCP_PORT = 6334
+
+// Helper to extract port from args
+function getPortFromArgs(): number | null {
+  const portIndex = process.argv.indexOf('--port')
+  if (portIndex !== -1 && portIndex + 1 < process.argv.length) {
+    const port = parseInt(process.argv[portIndex + 1])
+    return isNaN(port) ? null : port
+  }
+  return null
+}
 
 // Bootstrap
 export async function startIndexerService(projectPathArg = null) {
@@ -49,11 +61,16 @@ export async function startIndexerService(projectPathArg = null) {
   }
 
   // Start appropriate server based on mode
-  if (MCP_MODE) {
-    // MCP mode: start MCP server via stdio
+  if (MCP_HTTP_MODE) {
+    // HTTP mode: start HTTP MCP server for daemon (multi-client support)
+    const port = getPortFromArgs() || DEFAULT_MCP_PORT
+    await writeDaemonPortFile(port)
+    await startMcpHttpServer(port)
+  } else if (MCP_MODE) {
+    // MCP stdio mode: start MCP server via stdio (single client)
     await startMcpServer()
   } else {
-    // Daemon mode: just run with background indexing (no HTTP server)
+    // Daemon mode: just run with background indexing (no MCP server)
     console.log('[indexer-service] Daemon mode: running with background indexing...')
     // Keep process alive for background indexing
     await new Promise(() => {}) // Never resolves, keeps process alive
@@ -74,10 +91,11 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   console.log('[DEBUG] MCP_MODE:', MCP_MODE)
   console.log('[DEBUG] process.argv:', process.argv)
 
-  // Only start if explicitly running in MCP mode or daemon mode
-  if (!MCP_MODE) {
-    console.error('[ERROR] indexer-service.js must be run with --mcp flag')
-    console.error('[ERROR] Usage: node lib/indexer-service.js --mcp')
+  // Only start if explicitly running in MCP mode
+  if (!MCP_MODE && !MCP_HTTP_MODE) {
+    console.error('[ERROR] indexer-service.js must be run with --mcp or --mcp-http flag')
+    console.error('[ERROR] Usage: node lib/indexer-service.js --mcp (stdio mode)')
+    console.error('[ERROR]    or: node lib/indexer-service.js --mcp-http --port <port> (daemon mode)')
     console.error('[ERROR] For CLI commands, use: indexer <command>')
     process.exit(1)
   }

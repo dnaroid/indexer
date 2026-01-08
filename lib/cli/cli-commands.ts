@@ -43,14 +43,14 @@ const __dirname = path.dirname(__filename)
 const pkgPath = path.resolve(__dirname, '../../../package.json')
 const pkg = JSON.parse(fsSync.readFileSync(pkgPath, 'utf-8'))
 
-export async function ensureInitialized(startCwd: string) {
+export async function ensureInitialized(startCwd: string, failOnMissing = true) {
   const root = await findProjectRoot(startCwd)
   const paths = getPaths(root)
   const exists = await pathExists(paths.toIndexPath)
-  if (!exists) {
+  if (!exists && failOnMissing) {
     fail('CLI is not initialized. Run "indexer init" in project root.')
   }
-  return { root, paths }
+  return { root, paths, isInitialized: exists }
 }
 
 export async function checkAndAutoUpdate(command: string | null) {
@@ -178,7 +178,14 @@ export async function handleInit(startCwd: string) {
 }
 
 export async function handleStatus(startCwd: string) {
-  const { root } = await ensureInitialized(startCwd)
+  const { root, isInitialized } = await ensureInitialized(startCwd, false)
+
+  if (!isInitialized) {
+    log(`Project Root: ${root}`)
+    log(`Status: \x1b[33mNot Initialized\x1b[0m`)
+    log(`Run "indexer init" to setup.`)
+    return
+  }
 
   const qdrantUrl = process.env.QDRANT_URL || 'http://localhost:6333'
   const ollamaUrl = process.env.OLLAMA_URL || 'http://127.0.0.1:11434'
