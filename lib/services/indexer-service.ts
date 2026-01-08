@@ -1,5 +1,5 @@
 import {initTreeSitter} from '../utils/tree-sitter.js'
-import {loadGlobalConfig, writeDaemonPortFile} from '../utils/config-global.js'
+import {loadGlobalConfig, writeDaemonPortFile, DEFAULT_SETTINGS} from '../utils/config-global.js'
 import {log} from '../cli/cli-ui.js'
 import {registerProject} from './project-watcher.js'
 import {startHeartbeat, startInactivityTimer, stopAllTimers} from './inactivity-manager.js'
@@ -9,7 +9,7 @@ import {startMcpServer, startMcpHttpServer} from './mcp-service.js'
 // Mode flags
 const MCP_MODE = process.argv.includes('--mcp')
 const MCP_HTTP_MODE = process.argv.includes('--mcp-http')
-const DEFAULT_MCP_PORT = 6334
+const DEFAULT_MCP_PORT = DEFAULT_SETTINGS.SERVICE_PORT
 
 // Helper to extract port from args
 function getPortFromArgs(): number | null {

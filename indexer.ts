@@ -28,6 +28,9 @@ import {
   handleDeleteProject,
   handleTestCommand
 } from './lib/cli/cli-actions.js'
+import {
+  isDaemonRunning
+} from './lib/cli/daemon-manager.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -90,6 +93,7 @@ async function interactiveMenu(): Promise<void> {
     const root = await findProjectRoot(startCwd)
     const paths = getPaths(root)
     const isInstalled = await pathExists(paths.dotDir)
+    const daemonRunning = await isDaemonRunning()
 
     const options: CliOption[] = []
 

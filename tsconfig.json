@@ -31,6 +31,7 @@
   "exclude": [
     "node_modules",
     "build",
-    "**/*.test.js"
+    "**/*.test.js",
+    "lib/cli/mcp-proxy-template.js"
   ]
 }

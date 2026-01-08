@@ -5,139 +5,90 @@ import { fail, log } from '../cli/cli-ui.js'
 import { getProjectCollectionName } from '../utils/config-global.js'
 import { pathExists } from '../cli/cli-config.js'
 import { listProjectFiles } from '../core/indexer-core.js'
-
-interface EmbeddingResponse {
-  embedding: number[]
-}
-
-interface QdrantPointsResponse {
-  result?: {
-    points: any[]
-  }
-}
-
-interface QdrantScrollResponse {
-  result?: {
-    points: any[]
-  }
-}
+import { getDaemonPort, ensureDaemonRunning } from '../cli/daemon-manager.js'
 
 /**
- * Execute an MCP tool by calling handlers directly
+ * Execute an MCP tool via the running daemon (simulating an agent)
  * @param {string} startCwd - Starting directory
  * @param {string} toolName - Tool name to execute
  * @param {object} args - Tool arguments
- * @returns {Promise<object>} Tool result
+ * @returns {Promise<any>} Tool result
  */
 async function executeMcpTool(startCwd: string, toolName: string, args: any = {}): Promise<any> {
   const { root } = await ensureInitialized(startCwd)
   const collectionName = getProjectCollectionName(root)
 
-  // Import indexer-service functions
-  const { loadGlobalConfig } = await import('../utils/config-global.js')
-  const { createToolHandlers } = await import('./mcp-handlers.js')
-  const { buildTreeText, extractSymbols, runRipgrep, filterReferences } = await import('./mcp-tools.js')
+  await ensureDaemonRunning()
 
-  // Get project config
-  const config = await loadGlobalConfig()
-  const absRoot = path.resolve(root)
+  const port = await getDaemonPort()
+  const url = `http://127.0.0.1:${port}/mcp`
 
-  const projectConf = config.projects[absRoot]
-
-  if (!projectConf) {
-    throw new Error('Project not found in global config')
+  // Inject collectionId into arguments
+  const requestArgs = {
+    ...args,
+    collectionId: collectionName
   }
 
-  // Create tool dependencies
-  const qdrantUrl = process.env.QDRANT_URL || 'http://localhost:6333'
-  const ollamaUrl = process.env.OLLAMA_URL || 'http://127.0.0.1:11434'
-  const embedModel = process.env.EMBED_MODEL || 'unclemusclez/jina-embeddings-v2-base-code'
+  const payload = {
+    jsonrpc: '2.0',
+    id: 1,
+    method: 'tools/call',
+    params: {
+      name: toolName,
+      arguments: requestArgs
+    }
+  }
 
-  const deps = {
-    readFile: async (p: string) => fs.readFile(path.resolve(root, p), 'utf8'),
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json, text/event-stream'
+      },
+      body: JSON.stringify(payload)
+    })
 
-    embed: async (text: string): Promise<number[]> => {
-      const res = await fetch(`${ollamaUrl}/api/embeddings`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: embedModel,
-          prompt: text
-        })
-      })
-      const json = await res.json() as { embedding?: number[] }
-      return json.embedding || []
-    },
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+    }
 
-    searchQdrant: async (vector: number[], topK: number, pathPrefix?: string): Promise<any[]> => {
-      const filter = pathPrefix
-        ? { must: [{ key: 'path', match: { prefix: pathPrefix } }] }
-        : undefined
+    const text = await response.text()
 
-      const res = await fetch(
-        `${qdrantUrl}/collections/${collectionName}/points/search`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            vector,
-            limit: topK,
-            with_payload: true,
-            score_threshold: 0,
-            filter
-          })
+    // Parse JSON-RPC response
+    let json: any
+    try {
+      json = JSON.parse(text)
+    } catch (e) {
+      // Try parsing SSE format if raw JSON fails
+      const lines = text.trim().split('\n')
+      for (const line of lines) {
+        if (line.startsWith('data: ')) {
+          try {
+            json = JSON.parse(line.substring(6))
+            break
+          } catch (_) {}
         }
-      )
-      const json = await res.json() as { result?: any[] }
-      return json.result || []
-    },
-
-    searchSymbols: async (name: string, kind: string, topK: number): Promise<any[]> => {
-      const must: any[] = [
-        {
-          should: [
-            { key: 'symbol_names', match: { text: name } },
-            { key: 'symbol_references', match: { text: name } }
-          ]
-        }
-      ]
-      if (kind && kind !== 'any') {
-        must.push({ key: 'symbol_kinds', match: { any: [kind] } })
       }
+    }
 
-      const res = await fetch(
-        `${qdrantUrl}/collections/${collectionName}/points/scroll`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ filter: { must }, with_payload: true, limit: topK })
-        }
-      )
-      const json = await res.json() as { result?: { points?: any[] } }
-      return (json.result?.points || json.result || []) as any[]
-    },
+    if (!json) {
+      throw new Error(`Invalid response format from daemon: ${text.substring(0, 100)}...`)
+    }
 
-    listProjectFiles: async (): Promise<string[]> => {
-      const { listProjectFiles } = await import('../core/indexer-core.js')
-      return listProjectFiles(root)
-    },
+    if (json.error) {
+      throw new Error(`MCP Error ${json.error.code}: ${json.error.message}`)
+    }
 
-    extractSymbols,
-    buildTreeText,
-    runRipgrep: (symbol: string) => runRipgrep(symbol, root) as Promise<any[]>,
-    filterReferences
+    if (!json.result) {
+      throw new Error('No result in MCP response')
+    }
+
+    return json.result
+
+  } catch (err: any) {
+    throw new Error(`Failed to call daemon: ${err.message}`)
   }
-
-  // Create tool handlers
-  const handlers = createToolHandlers(deps as any)
-
-  // Execute tool
-  if (!handlers[toolName]) {
-    throw new Error(`Unknown tool: ${toolName}`)
-  }
-
-  const result = await handlers[toolName](args)
-  return result
 }
 
 /**

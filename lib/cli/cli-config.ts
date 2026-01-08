@@ -1,7 +1,9 @@
 import fs from "fs/promises"
 import path from "path"
 import {fail, log, warn} from "./cli-ui.js"
+import {DEFAULT_SETTINGS} from "../utils/config-global.js"
 import type {ProjectPaths, ProjectState} from "../types/index.js"
+import { fileURLToPath } from 'url'
 
 export async function pathExists(targetPath: string): Promise<boolean> {
   try {
@@ -453,169 +455,25 @@ export async function removeGitignoreEntry(root: string, entry: string): Promise
 
 // --- MCP Proxy Script Generation ---
 
-export function renderMcpProxyScript(paths: ProjectPaths, collectionId: string): string {
-  return `#!/usr/bin/env node
-/**
- * MCP Proxy Script for Code Indexer
- *
- * This script acts as a lightweight proxy between code-agents and the global
- * indexer-service daemon. It:
- * 1. Checks if the global daemon is running
- * 2. Starts the daemon if needed (HTTP mode)
- * 3. Adds collectionId to each request payload
- * 4. Proxies messages between code-agent and daemon via HTTP
- */
-
-import { spawn } from 'child_process'
-import path from 'path'
-
-const COLLECTION_ID = '${collectionId}'
-const PROJECT_ROOT = '${paths.root}'
-const DAEMON_PID_FILE = path.join(process.env.HOME || process.env.USERPROFILE, '.indexer', 'daemon.pid')
-const DAEMON_PORT_FILE = path.join(process.env.HOME || process.env.USERPROFILE, '.indexer', 'daemon.port')
-const DAEMON_CMD = 'node'
-const DAEMON_SCRIPT = path.join(PROJECT_ROOT, 'build', 'lib', 'services', 'indexer-service.js')
-const DEFAULT_PORT = 6334
-
-// Check if daemon is running
-async function isDaemonRunning() {
+export async function renderMcpProxyScript(paths: ProjectPaths, collectionId: string): Promise<string> {
+  const __filename = fileURLToPath(import.meta.url)
+  const __dirname = path.dirname(__filename)
+  const templatePath = path.join(__dirname, 'mcp-proxy-template.js')
+  
+  let template = ''
   try {
-    const fs = await import('fs/promises')
-    const pid = parseInt(await fs.readFile(DAEMON_PID_FILE, 'utf8'))
-    process.kill(pid, 0)
-    return true
-  } catch (e) {
-    return false
-  }
-}
-
-// Read daemon port
-async function readDaemonPort() {
-  try {
-    const fs = await import('fs/promises')
-    const portStr = await fs.readFile(DAEMON_PORT_FILE, 'utf8')
-    return parseInt(portStr.trim())
-  } catch (e) {
-    return DEFAULT_PORT
-  }
-}
-
-// Start daemon in background
-async function startDaemon() {
-  console.error('[MCP Proxy] Starting global indexer daemon...')
-
-  const child = spawn(DAEMON_CMD, [DAEMON_SCRIPT, '--mcp-http', '--port', String(DEFAULT_PORT)], {
-    detached: true,
-    stdio: 'ignore',
-    env: process.env
-  })
-
-  child.unref()
-
-  // Wait for daemon to start
-  const maxWait = 10000
-  const startTime = Date.now()
-
-  while (Date.now() - startTime < maxWait) {
-    if (await isDaemonRunning()) {
-      console.error('[MCP Proxy] Daemon started successfully')
-      return
-    }
-    await new Promise(resolve => setTimeout(resolve, 100))
+    template = await fs.readFile(templatePath, 'utf8')
+  } catch (e: any) {
+    // Fallback if running from source/different structure or file missing
+    console.error('Failed to read proxy template:', e.message)
+    // Fallback minimal script or re-throw
+    throw new Error('Could not find mcp-proxy-template.js')
   }
 
-  throw new Error('Failed to start daemon')
-}
+  const defaultPort = String(DEFAULT_SETTINGS.SERVICE_PORT)
 
-// Inject collectionId into MCP JSON-RPC request
-function injectCollectionId(data) {
-  try {
-    const parsed = JSON.parse(data)
-
-    if (parsed.method === 'tools/call' && parsed.params && parsed.params.arguments) {
-      parsed.params.arguments.collectionId = COLLECTION_ID
-      return JSON.stringify(parsed)
-    }
-
-    return data
-  } catch (e) {
-    return data
-  }
-}
-
-// Send request to daemon via HTTP
-async function sendToDaemon(port, request) {
-  const url = \`http://127.0.0.1:\${port}/mcp\`
-  const headers = {
-    'Content-Type': 'application/json',
-    'Accept': 'application/json, text/event-stream'
-  }
-
-  try {
-    const response = await fetch(url, { method: 'POST', headers, body: request })
-
-    if (!response.ok) {
-      throw new Error(\`HTTP \${response.status}: \${response.statusText}\`)
-    }
-
-    const text = await response.text()
-
-    // Parse SSE response format
-    const lines = text.trim().split('\\n')
-    for (const line of lines) {
-      if (line.startsWith('data: ')) {
-        return line.substring(6)
-      }
-    }
-
-    return text
-  } catch (err) {
-    console.error('[MCP Proxy] Error sending to daemon:', err.message)
-    throw err
-  }
-}
-
-// Main proxy logic
-async function main() {
-  // Ensure daemon is running
-  if (!(await isDaemonRunning())) {
-    await startDaemon()
-  }
-
-  console.error('[MCP Proxy] Connecting to daemon...')
-  const port = await readDaemonPort()
-  console.error(\`[MCP Proxy] Daemon port: \${port}\`)
-
-  let buffer = ''
-  process.stdin.on('data', async (chunk) => {
-    buffer += chunk.toString()
-    const lines = buffer.split('\\n')
-    buffer = lines.pop() || ''
-
-    for (const line of lines) {
-      if (line.trim()) {
-        try {
-          const modifiedRequest = injectCollectionId(line)
-          const response = await sendToDaemon(port, modifiedRequest)
-          process.stdout.write(response + '\\n')
-        } catch (err) {
-          const errorResponse = {
-            jsonrpc: '2.0',
-            error: { code: -32603, message: \`Proxy error: \${err.message}\` },
-            id: null
-          }
-          process.stdout.write(JSON.stringify(errorResponse) + '\\n')
-        }
-      }
-    }
-  })
-
-  console.error('[MCP Proxy] Ready to proxy MCP requests')
-}
-
-main().catch((err) => {
-  console.error('[MCP Proxy] Fatal error:', err.message)
-  process.exit(1)
-})
-`
+  return template
+    .replace('__COLLECTION_ID__', collectionId)
+    .replace('__PROJECT_ROOT__', paths.root)
+    .replace('__DEFAULT_PORT__', defaultPort)
 }

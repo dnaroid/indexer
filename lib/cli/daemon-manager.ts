@@ -1,5 +1,28 @@
-import fs from 'fs/promises'
-import { getDaemonPidFilePath } from '../utils/config-global.js'
+import fs from 'fs'
+import fsPromises from 'fs/promises'
+import path from 'path'
+import { spawn } from 'child_process'
+import { getDaemonPidFilePath, DEFAULT_SETTINGS, getLogFilePath } from '../utils/config-global.js'
+import { fileURLToPath } from 'url'
+
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
+
+/**
+ * Get the port the daemon is listening on
+ * @returns Port number
+ */
+export async function getDaemonPort(): Promise<number> {
+  const pidFile = getDaemonPidFilePath()
+  const portFile = path.join(path.dirname(pidFile), 'daemon.port')
+
+  try {
+    const portStr = await fsPromises.readFile(portFile, 'utf8')
+    return parseInt(portStr.trim(), 10)
+  } catch (e) {
+    return DEFAULT_SETTINGS.SERVICE_PORT
+  }
+}
 
 /**
  * Check if the indexer daemon is currently running
@@ -10,10 +33,9 @@ export async function isDaemonRunning(): Promise<boolean> {
   const globalPidFile = getDaemonPidFilePath()
 
   try {
-    await fs.access(globalPidFile)
-    const pid = parseInt(await fs.readFile(globalPidFile, 'utf8'), 10)
+    await fsPromises.access(globalPidFile)
+    const pid = parseInt(await fsPromises.readFile(globalPidFile, 'utf8'), 10)
     process.kill(pid, 0)
-    console.log(`[DEBUG] Global daemon running: PID=${pid}, file=${globalPidFile}`)
     return true
   } catch (e: any) {
     // Global daemon not running
@@ -23,8 +45,50 @@ export async function isDaemonRunning(): Promise<boolean> {
 }
 
 /**
+ * Ensure the indexer daemon is running, starting it if necessary
+ */
+export async function ensureDaemonRunning(): Promise<void> {
+  if (await isDaemonRunning()) {
+    return
+  }
+
+  console.error('[indexer] Starting global indexer daemon...')
+  
+  const daemonScript = path.resolve(__dirname, '../services/indexer-service.js')
+  const port = await getDaemonPort()
+  const logFile = getLogFilePath()
+
+  // Ensure log directory exists
+  const logDir = path.dirname(logFile)
+  await fsPromises.mkdir(logDir, { recursive: true })
+
+  const out = fs.openSync(logFile, 'a')
+  const err = fs.openSync(logFile, 'a')
+
+  const child = spawn('node', [daemonScript, '--mcp-http', '--port', String(port)], {
+    detached: true,
+    stdio: ['ignore', out, err],
+    env: process.env
+  })
+
+  child.unref()
+
+  // Wait for daemon to start
+  const maxWait = 10000
+  const startTime = Date.now()
+
+  while (Date.now() - startTime < maxWait) {
+    if (await isDaemonRunning()) {
+      return
+    }
+    await new Promise(resolve => setTimeout(resolve, 100))
+  }
+
+  throw new Error('Failed to start indexer daemon')
+}
+
+/**
  * Stop the indexer daemon gracefully
- * @returns
  */
 export async function stopDaemon(): Promise<void> {
   const daemonRunning = await isDaemonRunning()
@@ -36,7 +100,7 @@ export async function stopDaemon(): Promise<void> {
   const pidFilePath = getDaemonPidFilePath()
 
   try {
-    const pid = parseInt(await fs.readFile(pidFilePath, 'utf8'), 10)
+    const pid = parseInt(await fsPromises.readFile(pidFilePath, 'utf8'), 10)
     console.log(`[DEBUG] Stopping daemon with PID ${pid}...`)
 
     // Send SIGTERM for graceful shutdown
@@ -68,7 +132,7 @@ export async function stopDaemon(): Promise<void> {
 
   // Remove PID file
   try {
-    await fs.unlink(pidFilePath)
+    await fsPromises.unlink(pidFilePath)
     console.log(`[DEBUG] Removed PID file: ${pidFilePath}`)
   } catch (e: any) {
     console.log(`[DEBUG] Failed to remove PID file: ${e.message}`)

@@ -149,7 +149,7 @@ export async function handleInit(startCwd: string) {
   await fs.writeFile(paths.toIndexPath, renderToIndex({ type: projectType, dirs, exts }), 'utf8')
 
   const collectionName = getProjectCollectionName(root)
-  const mcpProxyScript = renderMcpProxyScript(paths, collectionName)
+  const mcpProxyScript = await renderMcpProxyScript(paths, collectionName)
   const mcpProxyPath = path.join(paths.dotDir, 'mcp-server.js')
   await fs.writeFile(mcpProxyPath, mcpProxyScript, 'utf8')
   await fs.chmod(mcpProxyPath, 0o755)
