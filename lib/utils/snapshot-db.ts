@@ -35,7 +35,16 @@ function getDb(): Database.Database {
     db = new Database(dbPath)
     db.pragma('journal_mode = WAL')
 
-    // Create table if not exists
+    // Create table for snapshot metadata
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS snapshot_metadata (
+        collection_id TEXT PRIMARY KEY,
+        version INTEGER NOT NULL,
+        timestamp INTEGER NOT NULL
+      )
+    `)
+
+    // Create table for snapshot files
     db.exec(`
       CREATE TABLE IF NOT EXISTS snapshots (
         collection_id TEXT NOT NULL,
@@ -73,13 +82,19 @@ export function closeDb(): void {
 export async function loadSnapshot(collectionId: string): Promise<Record<string, FileMetadata> | null> {
   return new Promise((resolve) => {
     const database = getDb()
-    const stmt = database.prepare('SELECT file_path, mtime_ms, size, hash FROM snapshots WHERE collection_id = ?')
-    const rows = stmt.all(collectionId) as SnapshotRow[]
 
-    if (rows.length === 0) {
+    // Check if snapshot exists in metadata
+    const metadataStmt = database.prepare('SELECT COUNT(*) as count FROM snapshot_metadata WHERE collection_id = ?')
+    const metadataResult = metadataStmt.get(collectionId) as { count: number }
+
+    if (metadataResult.count === 0) {
       resolve(null)
       return
     }
+
+    // Load files
+    const stmt = database.prepare('SELECT file_path, mtime_ms, size, hash FROM snapshots WHERE collection_id = ?')
+    const rows = stmt.all(collectionId) as SnapshotRow[]
 
     const files: Record<string, FileMetadata> = {}
     for (const row of rows) {
@@ -97,17 +112,24 @@ export async function loadSnapshot(collectionId: string): Promise<Record<string,
 /**
  * Save snapshot for a collection
  */
-export async function saveSnapshot(collectionId: string, files: Record<string, FileMetadata>): Promise<void> {
+export async function saveSnapshot(collectionId: string, files: Record<string, FileMetadata>, version: number = 1, timestamp: number = Date.now()): Promise<void> {
   return new Promise((resolve) => {
     const database = getDb()
 
     // Use transaction for better performance
     const transaction = database.transaction(() => {
-      // Clear existing entries for this collection
+      // Save metadata
+      const metadataStmt = database.prepare(`
+        INSERT OR REPLACE INTO snapshot_metadata (collection_id, version, timestamp)
+        VALUES (?, ?, ?)
+      `)
+      metadataStmt.run(collectionId, version, timestamp)
+
+      // Clear existing file entries for this collection
       const deleteStmt = database.prepare('DELETE FROM snapshots WHERE collection_id = ?')
       deleteStmt.run(collectionId)
 
-      // Insert new entries
+      // Insert new file entries
       const insertStmt = database.prepare(`
         INSERT INTO snapshots (collection_id, file_path, mtime_ms, size, hash)
         VALUES (?, ?, ?, ?, ?)
@@ -129,8 +151,17 @@ export async function saveSnapshot(collectionId: string, files: Record<string, F
 export async function deleteSnapshot(collectionId: string): Promise<void> {
   return new Promise((resolve) => {
     const database = getDb()
-    const stmt = database.prepare('DELETE FROM snapshots WHERE collection_id = ?')
-    stmt.run(collectionId)
+
+    // Use transaction to delete from both tables
+    const transaction = database.transaction(() => {
+      const deleteMetadataStmt = database.prepare('DELETE FROM snapshot_metadata WHERE collection_id = ?')
+      deleteMetadataStmt.run(collectionId)
+
+      const deleteFilesStmt = database.prepare('DELETE FROM snapshots WHERE collection_id = ?')
+      deleteFilesStmt.run(collectionId)
+    })
+
+    transaction()
     resolve()
   })
 }
@@ -141,7 +172,7 @@ export async function deleteSnapshot(collectionId: string): Promise<void> {
 export async function snapshotExists(collectionId: string): Promise<boolean> {
   return new Promise((resolve) => {
     const database = getDb()
-    const stmt = database.prepare('SELECT COUNT(*) as count FROM snapshots WHERE collection_id = ?')
+    const stmt = database.prepare('SELECT COUNT(*) as count FROM snapshot_metadata WHERE collection_id = ?')
     const result = stmt.get(collectionId) as { count: number }
     resolve(result.count > 0)
   })
@@ -151,20 +182,30 @@ export async function snapshotExists(collectionId: string): Promise<boolean> {
  * Get snapshot metadata
  */
 export async function getSnapshotMetadata(collectionId: string): Promise<{
+  version: number
+  timestamp: number
   fileCount: number
 } | null> {
   return new Promise((resolve) => {
     const database = getDb()
-    const stmt = database.prepare('SELECT COUNT(*) as count FROM snapshots WHERE collection_id = ?')
-    const result = stmt.get(collectionId) as { count: number }
 
-    if (result.count === 0) {
+    // Get metadata
+    const metadataStmt = database.prepare('SELECT version, timestamp FROM snapshot_metadata WHERE collection_id = ?')
+    const metadataResult = metadataStmt.get(collectionId) as { version: number, timestamp: number } | undefined
+
+    if (!metadataResult) {
       resolve(null)
       return
     }
 
+    // Get file count
+    const fileCountStmt = database.prepare('SELECT COUNT(*) as count FROM snapshots WHERE collection_id = ?')
+    const fileCountResult = fileCountStmt.get(collectionId) as { count: number }
+
     resolve({
-      fileCount: result.count
+      version: metadataResult.version,
+      timestamp: metadataResult.timestamp,
+      fileCount: fileCountResult.count
     })
   })
 }
@@ -175,7 +216,7 @@ export async function getSnapshotMetadata(collectionId: string): Promise<{
 export async function getAllCollectionIds(): Promise<string[]> {
   return new Promise((resolve) => {
     const database = getDb()
-    const stmt = database.prepare('SELECT DISTINCT collection_id FROM snapshots')
+    const stmt = database.prepare('SELECT collection_id FROM snapshot_metadata')
     const rows = stmt.all() as { collection_id: string }[]
     resolve(rows.map(r => r.collection_id))
   })

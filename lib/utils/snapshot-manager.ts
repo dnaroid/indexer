@@ -78,7 +78,7 @@ export async function loadSnapshot(projectRoot: string): Promise<Snapshot | null
  */
 export async function saveSnapshot(projectRoot: string, snapshot: Snapshot): Promise<void> {
   const collectionId = getProjectCollectionName(projectRoot)
-  await snapshotDb.saveSnapshot(collectionId, snapshot.files)
+  await snapshotDb.saveSnapshot(collectionId, snapshot.files, snapshot.version, snapshot.timestamp)
 }
 
 /**
@@ -236,9 +236,5 @@ export async function getSnapshotMetadata(projectRoot: string): Promise<{
     return null
   }
 
-  return {
-    version: SNAPSHOT_VERSION,
-    timestamp: Date.now(),
-    fileCount: metadata.fileCount
-  }
+  return metadata
 }
