@@ -29,7 +29,8 @@ import {
   handleTestCommand,
   handleUpdateMcp,
   handleStartDaemon,
-  handleStopDaemon
+  handleStopDaemon,
+  handleMcpHttpDaemon
 } from './lib/cli/cli-actions.js'
 import {
   isDaemonRunning
@@ -43,11 +44,21 @@ const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf-8'))
 const args = process.argv.slice(2)
 let command: string | null = null
 let projectPathArg: string | null = null
+let mcpHttpMode: boolean = false
+let mcpPort: string | null = null
 
 const cleanArgs: string[] = []
-for (const arg of args) {
+for (let i = 0; i < args.length; i++) {
+  const arg = args[i]
   if (arg.startsWith('--project=')) {
     projectPathArg = arg.split('=')[1]
+  } else if (arg === '--mcp-http') {
+    mcpHttpMode = true
+  } else if (arg === '--port' && i + 1 < args.length) {
+    mcpPort = args[i + 1]
+    i++ // Skip the next argument as it's the port value
+  } else if (arg.startsWith('--port=')) {
+    mcpPort = arg.split('=')[1]
   } else if (!command) {
     command = arg
   } else {
@@ -189,6 +200,12 @@ async function interactiveMenu(): Promise<void> {
 }
 
 async function main(): Promise<void> {
+  // Handle --mcp-http flag before any other processing
+  if (mcpHttpMode) {
+    await handleMcpHttpDaemon(mcpPort)
+    return
+  }
+
   if (!command || command === 'status') {
     printBanner()
   }

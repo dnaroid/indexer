@@ -415,3 +415,35 @@ export async function handleStopDaemon() {
     fail(`Failed to stop daemon: ${e.message}`)
   }
 }
+
+export async function handleMcpHttpDaemon(portArg: string | null) {
+  const __filename = fileURLToPath(import.meta.url)
+  const __dirname = path.dirname(__filename)
+  const daemonScript = path.resolve(__dirname, '../services/indexer-service.js')
+
+  // Build args for indexer-service.js
+  const args = ['--mcp-http']
+  if (portArg) {
+    args.push('--port', portArg)
+  }
+
+  console.error(`[indexer] Starting indexer-service.js in MCP HTTP mode on port ${portArg || 'default'}...`)
+
+  // Spawn indexer-service.js directly
+  const child = spawn('node', [daemonScript, ...args], {
+    stdio: 'inherit',
+    env: process.env
+  })
+
+  child.on('error', (err: Error) => {
+    console.error(`[indexer] Failed to start indexer-service.js: ${err.message}`)
+    process.exit(1)
+  })
+
+  child.on('exit', (code: number | null) => {
+    if (code !== 0) {
+      console.error(`[indexer] indexer-service.js exited with code ${code}`)
+    }
+    process.exit(code || 0)
+  })
+}

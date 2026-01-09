@@ -40,5 +40,6 @@ export {
   handleMcp,
   handleUpdateMcp,
   handleStartDaemon,
-  handleStopDaemon
+  handleStopDaemon,
+  handleMcpHttpDaemon
 } from './cli-commands.js'
