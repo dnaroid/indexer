@@ -14,6 +14,7 @@ export const CODEBASE_PROMPT = [
   'You are an expert developer working in this codebase.',
   '',
   '- **MANDATORY**: For ANY codebase search/navigation, ALWAYS use indexer MCP FIRST (search_codebase, search_symbols, get_file_outline, find_usages). NEVER use Grep, Glob, or shell tools before indexer MCP. This is non-negotiable.',
+  '- collectionId is injected by the MCP proxy; do NOT try to compute or request it. Call tools without collectionId unless you are a custom client.',
   '',
   'Available MCP Tools & When to Use Them:',
   '1. search_codebase: Use for semantic/conceptual searches (e.g., "how is authentication handled?").',
@@ -127,6 +128,9 @@ function createToolDeps(projectPath: string, projectConf: any) {
  * @returns {Promise<object>} Query result
  */
 export async function executeQuery({ collectionId, tool, args }: { collectionId: string, tool: string, args: any }): Promise<any> {
+  if (!collectionId) {
+    throw new Error('Missing collectionId. The MCP proxy injects it automatically; custom clients must provide it explicitly.')
+  }
   // Find project by collectionId
   const config = await loadGlobalConfig()
   let projectPath = null
@@ -222,7 +226,7 @@ export function createMcpServer() {
     {
       description: 'Semantic search over indexed codebase',
       inputSchema: {
-        collectionId: z.string().describe('Collection ID for project'),
+        collectionId: z.string().optional().describe('Collection ID for project (injected by proxy; omit unless you are a custom client)'),
         query: z.string().describe('Search query'),
         top_k: z.number().optional().default(5).describe('Number of results'),
         path_prefix: z.string().optional().describe('Filter by path prefix')
@@ -236,7 +240,7 @@ export function createMcpServer() {
     {
       description: 'Search symbols (functions, classes, files) by name',
       inputSchema: {
-        collectionId: z.string().describe('Collection ID for project'),
+        collectionId: z.string().optional().describe('Collection ID for project (injected by proxy; omit unless you are a custom client)'),
         name: z.string().describe('Symbol name to search'),
         kind: z.string().optional().default('any').describe('Symbol kind filter'),
         top_k: z.number().optional().default(10).describe('Number of results')
@@ -250,7 +254,7 @@ export function createMcpServer() {
     {
       description: 'Get list of symbols (classes, methods) in a file',
       inputSchema: {
-        collectionId: z.string().describe('Collection ID for project'),
+        collectionId: z.string().optional().describe('Collection ID for project (injected by proxy; omit unless you are a custom client)'),
         path: z.string().describe('File path')
       }
     },
@@ -262,7 +266,7 @@ export function createMcpServer() {
     {
       description: 'Get recursive visual tree of project files',
       inputSchema: {
-        collectionId: z.string().describe('Collection ID for project')
+        collectionId: z.string().optional().describe('Collection ID for project (injected by proxy; omit unless you are a custom client)')
       }
     },
     handlers.get_project_structure
@@ -273,7 +277,7 @@ export function createMcpServer() {
     {
       description: 'Find usages of a symbol, optionally filtered by context (e.g. class name)',
       inputSchema: {
-        collectionId: z.string().describe('Collection ID for project'),
+        collectionId: z.string().optional().describe('Collection ID for project (injected by proxy; omit unless you are a custom client)'),
         symbol: z.string().describe('Symbol name or qualified name (e.g. "takeDamage" or "Enemy.takeDamage")'),
         context: z.string().optional().describe('Context symbol to filter by (e.g. "Enemy")')
       }
