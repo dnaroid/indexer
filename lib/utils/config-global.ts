@@ -6,7 +6,7 @@ import crypto from 'crypto'
 const HOME_DIR = os.homedir()
 const INDEXER_DIR = path.join(HOME_DIR, '.indexer')
 const GLOBAL_CONFIG_PATH = path.join(INDEXER_DIR, 'config.json')
-const LOG_FILE = path.join(INDEXER_DIR, 'log.txt')
+const LOG_FILE = path.join(INDEXER_DIR, 'daemon.log')
 const DAEMON_PID_FILE = path.join(INDEXER_DIR, 'daemon.pid')
 const DAEMON_PORT_FILE = path.join(INDEXER_DIR, 'daemon.port')
 const SNAPSHOT_DB_PATH = path.join(INDEXER_DIR, 'snapshots.db')
@@ -61,6 +61,16 @@ async function migrateOldConfig() {
     }
   } catch (e: any) {
     // Old logs don't exist, nothing to do
+  }
+
+  // Migrate log.txt to daemon.log
+  const oldLogTxt = path.join(INDEXER_DIR, 'log.txt')
+  try {
+    await fs.access(oldLogTxt)
+    await fs.rename(oldLogTxt, LOG_FILE)
+    console.log(`[Migration] Renamed log.txt to daemon.log`)
+  } catch (e: any) {
+    // Old log.txt doesn't exist, nothing to do
   }
 }
 

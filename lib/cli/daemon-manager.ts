@@ -2,11 +2,31 @@ import fs from 'fs'
 import fsPromises from 'fs/promises'
 import path from 'path'
 import { spawn } from 'child_process'
+import { Transform } from 'stream'
 import { getDaemonPidFilePath, DEFAULT_SETTINGS, getLogFilePath } from '../utils/config-global.js'
 import { fileURLToPath } from 'url'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
+
+/**
+ * Create a transform stream that adds timestamps to each line
+ */
+function createTimestampStream(): Transform {
+  return new Transform({
+    transform(chunk, encoding, callback) {
+      const timestamp = new Date().toISOString()
+      const lines = chunk.toString().split('\n')
+      const timestampedLines = lines.map((line, i) => {
+        if (line.trim() === '' && i === lines.length - 1) {
+          return ''
+        }
+        return line ? `[${timestamp}] ${line}` : line
+      })
+      callback(null, timestampedLines.join('\n'))
+    }
+  })
+}
 
 /**
  * Get the port the daemon is listening on
@@ -62,19 +82,26 @@ export async function ensureDaemonRunning(): Promise<void> {
   const logDir = path.dirname(logFile)
   await fsPromises.mkdir(logDir, { recursive: true })
 
-  const out = fs.openSync(logFile, 'a')
-  const err = fs.openSync(logFile, 'a')
+  const logStream = fs.createWriteStream(logFile, { flags: 'a' })
+  const timestampOut = createTimestampStream()
+  const timestampErr = createTimestampStream()
+
+  timestampOut.pipe(logStream)
+  timestampErr.pipe(logStream)
 
   const child = spawn('node', [daemonScript, '--mcp-http', '--port', String(port)], {
     detached: true,
-    stdio: ['ignore', out, err],
+    stdio: ['ignore', 'pipe', 'pipe'],
     env: process.env
   })
+
+  child.stdout.pipe(timestampOut)
+  child.stderr.pipe(timestampErr)
 
   child.unref()
 
   // Wait for daemon to start
-  const maxWait = 10000
+  const maxWait = 20000
   const startTime = Date.now()
 
   while (Date.now() - startTime < maxWait) {
