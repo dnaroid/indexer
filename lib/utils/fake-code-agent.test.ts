@@ -173,3 +173,15 @@ test('FakeCodeAgent can close connection cleanly', async () => {
 
   assert.ok(true, 'Connection closed successfully')
 })
+
+// Global cleanup after all tests
+test.after(async () => {
+  // Wait a bit for any remaining processes to exit
+  await new Promise(resolve => setTimeout(resolve, 100))
+
+  // Force exit after cleanup - these tests are integration tests
+  // and we don't need to wait for all resources to cleanly close
+  setTimeout(() => {
+    process.exit(0)
+  }, 200).unref() // unref so it doesn't keep process alive
+})

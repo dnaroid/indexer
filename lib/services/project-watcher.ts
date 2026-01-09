@@ -105,8 +105,12 @@ export async function registerProject(projectPath: string): Promise<void> {
   // Initial sync with snapshot
   await syncProjectWithDiff(absPath, true)
 
-  // Start project-level watcher
-  startProjectWatcher(absPath)
+  // Start project-level watcher (skip in test mode to avoid keeping event loop open)
+  if (process.env.NODE_ENV !== 'test') {
+    startProjectWatcher(absPath)
+  } else {
+    log(`Skipping file watcher in test mode for ${absPath}`)
+  }
 }
 
 /**
