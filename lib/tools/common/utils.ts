@@ -1,25 +1,12 @@
 import path from 'path'
 import {spawn} from 'child_process'
-import {extractJSSymbols, isJSCodeAtPosition} from '../utils/ast-js.js'
+import {extractJSSymbols, isJSCodeAtPosition} from '../../utils/ast-js.js'
 import {
   extractCSharpSymbols,
   extractPythonSymbols,
   isCodeAtPosition
-} from '../utils/tree-sitter.js'
-
-export interface RipgrepResult {
-  path: string
-  line: number
-  column: number
-  snippet: string
-}
-
-export interface SymbolInfo {
-  name: string
-  kind: string
-  line?: number
-  column?: number
-}
+} from '../../utils/tree-sitter.js'
+import type { RipgrepResult } from './types.js'
 
 export function detectLanguage(filePath: string): string {
   const ext = path.extname(filePath).toLowerCase()

@@ -2,14 +2,18 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import fs from 'fs/promises'
 import path from 'path'
-import { createToolHandlers } from '../lib/mcp/mcp-handlers.js'
+import { searchCodebase } from '../lib/tools/search-codebase/handler.js'
+import { getFileOutline } from '../lib/tools/get-file-outline/handler.js'
+import { getProjectStructure } from '../lib/tools/get-project-structure/handler.js'
+import { findUsages } from '../lib/tools/find-usages/handler.js'
 import {
   extractSymbols,
   buildTreeText,
   runRipgrep,
   detectLanguage,
   filterReferences
-} from '../lib/mcp/mcp-tools.js'
+} from '../lib/tools/common/utils.js'
+import type { ToolHandlersDeps } from '../lib/tools/common/types.js'
 import { initTreeSitter } from '../lib/utils/tree-sitter.js'
 import fg from 'fast-glob'
 
@@ -73,7 +77,7 @@ async function listPlaygroundFiles(): Promise<string[]> {
 }
 
 // Deps with REAL local tools, but mocked network/DB
-const realDeps = {
+const realDeps: ToolHandlersDeps = {
   extractSymbols,
   buildTreeText,
   runRipgrep: (pattern: string) => runRipgrep(pattern, PLAYGROUND_DIR) as Promise<any[]>,
@@ -99,10 +103,8 @@ test.after(async () => {
   delete process.env.WORKSPACE_DIR
 })
 
-const handlers = createToolHandlers(realDeps)
-
 test('Real Execution: get_project_structure', async () => {
-  const res = await handlers.get_project_structure()
+  const res = await getProjectStructure(realDeps)
   const tree = res.content[0].text
 
   console.log('Project Structure:\n', tree)
@@ -113,7 +115,7 @@ test('Real Execution: get_project_structure', async () => {
 })
 
 test('Real Execution: get_file_outline (JS)', async () => {
-  const res = await handlers.get_file_outline({ path: 'main.js' })
+  const res = await getFileOutline(realDeps,{ path: 'main.js' })
   const symbols = JSON.parse(res.content[0].text)
 
   // UserManager, UserManager.constructor, UserManager.addUser, init
@@ -123,7 +125,7 @@ test('Real Execution: get_file_outline (JS)', async () => {
 })
 
 test('Real Execution: get_file_outline (Python)', async () => {
-  const res = await handlers.get_file_outline({ path: 'utils/helpers.py' })
+  const res = await getFileOutline(realDeps,{ path: 'utils/helpers.py' })
   const symbols = JSON.parse(res.content[0].text)
 
   assert.ok(symbols.find((s: any) => s.name === 'format_user'))
@@ -131,7 +133,7 @@ test('Real Execution: get_file_outline (Python)', async () => {
 })
 
 test('Real Execution: get_file_outline (C#)', async () => {
-  const res = await handlers.get_file_outline({ path: 'Player.cs' })
+  const res = await getFileOutline(realDeps,{ path: 'Player.cs' })
   const symbols = JSON.parse(res.content[0].text)
 
   assert.ok(symbols.find((s: any) => s.name === 'Player'))
@@ -141,7 +143,7 @@ test('Real Execution: get_file_outline (C#)', async () => {
 })
 
 test('Real Execution: find_usages (ripgrep)', async () => {
-  const res = await handlers.find_usages({ symbol: 'UserManager', context: undefined })
+  const res = await findUsages(realDeps,{ symbol: 'UserManager', context: undefined })
   const results = JSON.parse(res.content[0].text)
 
   assert.ok(results.length > 0)

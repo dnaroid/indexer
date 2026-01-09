@@ -1,21 +1,14 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { createToolHandlers } from '../lib/mcp/mcp-handlers.js'
-
-interface MockDeps {
-  searchQdrant: (vector: number[], topK: number, pathPrefix?: string) => Promise<any[]>
-  searchSymbols: (name: string, kind?: string, topK?: number) => Promise<any[]>
-  embed: (text: string) => Promise<number[]>
-  listProjectFiles: () => Promise<string[]>
-  extractSymbols: (path: string, content: string) => Promise<any[]>
-  buildTreeText: (files: string[]) => string
-  runRipgrep: (name: string) => Promise<any[]>
-  filterReferences: (refs: any[]) => Promise<any[]>
-  readFile: (path: string) => Promise<string>
-}
+import { searchCodebase } from '../lib/tools/search-codebase/handler.js'
+import { searchSymbols } from '../lib/tools/search-symbols/handler.js'
+import { getFileOutline } from '../lib/tools/get-file-outline/handler.js'
+import { getProjectStructure } from '../lib/tools/get-project-structure/handler.js'
+import { findUsages } from '../lib/tools/find-usages/handler.js'
+import type { ToolHandlersDeps } from '../lib/tools/common/types.js'
 
 // Mock dependencies
-const mockDeps: MockDeps = {
+const mockDeps: ToolHandlersDeps = {
   searchQdrant: async () => [],
   searchSymbols: async () => [],
   embed: async () => [0.1, 0.2],
@@ -27,18 +20,13 @@ const mockDeps: MockDeps = {
   readFile: async () => 'mock content'
 }
 
-// Create handlers with injected mocks
-const handlers = createToolHandlers(mockDeps)
-
 test('get_project_structure returns tree text', async () => {
-  const res = await handlers.get_project_structure()
-  // The handler returns stringified JSON usually? No, check impl.
-  // return {content: [{type: 'text', text: treeText || '(empty project)'}]}
+  const res = await getProjectStructure(mockDeps)
   assert.equal(res.content[0].text, 'MockTree(2)')
 })
 
 test('get_file_outline returns symbols', async () => {
-  const res = await handlers.get_file_outline({ path: 'test.js' })
+  const res = await getFileOutline(mockDeps, { path: 'test.js' })
   const json = JSON.parse(res.content[0].text)
 
   assert.equal(json.length, 1)
@@ -48,7 +36,7 @@ test('get_file_outline returns symbols', async () => {
 })
 
 test('find_usages delegates to ripgrep', async () => {
-  const res = await handlers.find_usages({ symbol: 'MySymbol', context: undefined })
+  const res = await findUsages(mockDeps, { symbol: 'MySymbol', context: undefined })
 
   const json = JSON.parse(res.content[0].text)
 

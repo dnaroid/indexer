@@ -2,7 +2,9 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import fs from 'fs/promises'
 import path from 'path'
-import { createToolHandlers } from '../lib/mcp/mcp-handlers.js'
+import { searchCodebase } from '../lib/tools/search-codebase/handler.js'
+import { searchSymbols } from '../lib/tools/search-symbols/handler.js'
+import { getProjectStructure } from '../lib/tools/get-project-structure/handler.js'
 import { initTreeSitter } from '../lib/utils/tree-sitter.js'
 import { listProjectFiles } from '../lib/core/indexer-core.js'
 import {
@@ -10,22 +12,11 @@ import {
   extractSymbols,
   filterReferences,
   runRipgrep
-} from '../lib/mcp/mcp-tools.js'
-
-interface Deps {
-  readFile: (p: string) => Promise<string>
-  embed: (text: string) => Promise<number[]>
-  searchQdrant: (vector: number[], topK: number, pathPrefix?: string) => Promise<any[]>
-  searchSymbols: (name: string, kind?: string, topK?: number) => Promise<any[]>
-  listProjectFiles: () => Promise<string[]>
-  extractSymbols: (path: string, content: string) => Promise<any[]>
-  buildTreeText: (files: string[]) => string
-  runRipgrep: (symbol: string) => Promise<any[]>
-  filterReferences: (results: any[], cwd: string, readFile: any) => Promise<any[]>
-}
+} from '../lib/tools/common/utils.js'
+import type { ToolHandlersDeps } from '../lib/tools/common/types.js'
 
 // Mock dependencies using real implementations where possible
-const deps: Deps = {
+const deps: ToolHandlersDeps = {
   readFile: (p: string) => fs.readFile(path.resolve(process.env.WORKSPACE_DIR || process.cwd(), p), 'utf8'),
   embed: async (text: string): Promise<number[]> => {
     const res = await fetch(`${process.env.OLLAMA_URL || 'http://127.0.0.1:11434'}/api/embeddings`, {
@@ -78,11 +69,10 @@ test('Live Search: indexer should return results from Qdrant with current model'
   process.env.WORKSPACE_DIR = startCwd
 
   await initTreeSitter()
-  const handlers = createToolHandlers(deps)
 
   await t.test('search_codebase should return semantic results', async () => {
     try {
-      const res = await handlers.search_codebase({
+      const res = await searchCodebase(deps, {
         query: "how embeddings are generated",
         top_k: 2
       })
@@ -98,7 +88,7 @@ test('Live Search: indexer should return results from Qdrant with current model'
   })
 
   await t.test('get_project_structure should return valid tree', async () => {
-    const res = await handlers.get_project_structure()
+    const res = await getProjectStructure(deps)
     const tree = res.content[0].text
     assert.ok(tree.includes('lib'))
   })

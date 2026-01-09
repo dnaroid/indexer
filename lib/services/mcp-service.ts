@@ -5,10 +5,15 @@ import { randomUUID } from 'crypto'
 import http from 'http'
 import { z } from 'zod'
 import { updateActivity } from './inactivity-manager.js'
-import { createToolHandlers } from '../mcp/mcp-handlers.js'
 import { loadGlobalConfig, getProjectConfig } from '../utils/config-global.js'
 import { listProjectFiles } from '../core/indexer-core.js'
-import { buildTreeText, extractSymbols, runRipgrep, filterReferences } from '../mcp/mcp-tools.js'
+import { buildTreeText, extractSymbols, runRipgrep, filterReferences } from '../tools/common/utils.js'
+import { searchCodebase } from '../tools/search-codebase/handler.js'
+import { searchSymbols } from '../tools/search-symbols/handler.js'
+import { getFileOutline } from '../tools/get-file-outline/handler.js'
+import { getProjectStructure } from '../tools/get-project-structure/handler.js'
+import { findUsages } from '../tools/find-usages/handler.js'
+import type { ToolHandlersDeps } from '../tools/common/types.js'
 
 export const CODEBASE_PROMPT = [
   'You are an expert developer working in this codebase.',
@@ -40,7 +45,7 @@ export const CODEBASE_PROMPT = [
  * @param {object} projectConf - Project configuration
  * @returns {object} Tool dependencies
  */
-function createToolDeps(projectPath: string, projectConf: any) {
+function createToolDeps(projectPath: string, projectConf: any): ToolHandlersDeps {
   const { collectionName, settings } = projectConf
   const qdrantUrl = process.env.QDRANT_URL || settings?.QDRANT_URL || 'http://localhost:6333'
   const ollamaUrl = process.env.OLLAMA_URL || settings?.OLLAMA_URL || 'http://127.0.0.1:11434'
@@ -117,7 +122,7 @@ function createToolDeps(projectPath: string, projectConf: any) {
     listProjectFiles: () => listProjectFiles(projectPath),
     extractSymbols,
     buildTreeText,
-    runRipgrep: (symbol: string) => runRipgrep(symbol, projectPath),
+    runRipgrep: (symbol: string) => runRipgrep(symbol, projectPath) as Promise<any[]>,
     filterReferences
   }
 }
@@ -148,8 +153,15 @@ export async function executeQuery({ collectionId, tool, args }: { collectionId:
     throw new Error(`Collection not found: ${collectionId}`)
   }
 
-  const deps = createToolDeps(projectPath, projectConf) as any
-  const handlers = createToolHandlers(deps)
+  const deps = createToolDeps(projectPath, projectConf)
+
+  const handlers: Record<string, (args: any) => Promise<any>> = {
+    search_codebase: (args) => searchCodebase(deps, args),
+    search_symbols: (args) => searchSymbols(deps, args),
+    get_file_outline: (args) => getFileOutline(deps, args),
+    get_project_structure: () => getProjectStructure(deps),
+    find_usages: (args) => findUsages(deps, args)
+  }
 
   if (!handlers[tool]) {
     throw new Error(`Unknown tool: ${tool}`)

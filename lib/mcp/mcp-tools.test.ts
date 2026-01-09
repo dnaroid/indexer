@@ -7,10 +7,9 @@ import {
   extractSymbols,
   buildTreeText,
   runRipgrep,
-  filterReferences,
-  type RipgrepResult,
-  type SymbolInfo
-} from './mcp-tools.js'
+  filterReferences
+} from '../tools/common/utils.js'
+import type { RipgrepResult, SymbolInfo } from '../tools/common/types.js'
 
 // --- Mocking child_process for runRipgrep ---
 interface MockChildProcess {
