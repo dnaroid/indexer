@@ -25,6 +25,7 @@
 
 # Local
 /.plans/
+/.tickets/
 
 # Documentation
 AGENTS.md

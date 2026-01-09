@@ -11,6 +11,7 @@ import {
   removeProjectFromConfig
 } from '../utils/config-global.js'
 import { isQdrantUp } from './collection-manager.js'
+import { deleteSnapshot } from '../utils/snapshot-manager.js'
 
 interface ProjectData {
   collectionName: string
@@ -91,7 +92,7 @@ export async function handleDeleteProject(projectIndexOrPath?: string): Promise<
 
   const [projectPath, projectData] = projectToDelete
 
-  if (await confirmAction(`Delete project "${projectPath}"? This will remove:\n  - Project from global config\n  - Collection "${projectData.collectionName}" from Qdrant\n  - .indexer/ directory from project`)) {
+  if (await confirmAction(`Delete project "${projectPath}"? This will remove:\n  - Project from global config\n  - Collection "${projectData.collectionName}" from Qdrant\n  - Snapshot from database\n  - .indexer/ directory from project`)) {
     // 1. Remove from global config
     await removeProjectFromConfig(projectPath)
 
@@ -108,6 +109,14 @@ export async function handleDeleteProject(projectIndexOrPath?: string): Promise<
       }
     } else {
       warn('Qdrant is not running. Collection will NOT be deleted.')
+    }
+
+    // 2.5. Delete snapshot from database
+    try {
+      await deleteSnapshot(projectPath)
+      log(`Deleted snapshot from database`)
+    } catch (e: any) {
+      warn(`Failed to delete snapshot: ${e.message}`)
     }
 
     // 3. Delete .indexer directory

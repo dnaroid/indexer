@@ -25,13 +25,14 @@ import {
 } from './cli-config.js'
 
 import { detectProjectIndexConfig, renderToIndex } from '../core/project-detector.js'
-import { dropCollections, runOneOffIndex } from '../core/indexer-core.js'
+import { dropCollections, runOneOffIndex, deleteCollectionByName } from '../core/indexer-core.js'
 import { checkSystemRequirements, setupOllamaModel } from '../utils/system-check.js'
 import {
   addProjectToConfig,
   getProjectCollectionName,
   loadGlobalConfig
 } from '../utils/config-global.js'
+import { deleteSnapshot } from '../utils/snapshot-manager.js'
 import {
   renderMcpProxyScript
 } from './cli-config.js'
@@ -285,18 +286,28 @@ export async function handleUninstall(startCwd: string) {
     fail('No .indexer/ in this project to uninstall.')
   }
 
+  const collectionName = getProjectCollectionName(root)
   const qdrantUrl = process.env.QDRANT_URL || 'http://localhost:6333'
   const qdrantUp = await isQdrantUp(qdrantUrl)
 
   if (qdrantUp) {
     log('Dropping Qdrant collection...')
     try {
-      // await dropCollections() // TODO: This needs to be fixed
+      await deleteCollectionByName(collectionName)
+      log(`Deleted collection: ${collectionName}`)
     } catch (e: any) {
       warn(`Failed to drop collection: ${e.message}`)
     }
   } else {
     warn('Qdrant is not running. Collection will NOT be dropped (files only).')
+  }
+
+  // Delete snapshot from database
+  try {
+    await deleteSnapshot(root)
+    log('Deleted snapshot from database')
+  } catch (e: any) {
+    warn(`Failed to delete snapshot: ${e.message}`)
   }
 
   await fs.rm(paths.dotDir, { recursive: true, force: true })

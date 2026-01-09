@@ -9,6 +9,7 @@ const GLOBAL_CONFIG_PATH = path.join(INDEXER_DIR, 'config.json')
 const LOG_FILE = path.join(INDEXER_DIR, 'log.txt')
 const DAEMON_PID_FILE = path.join(INDEXER_DIR, 'daemon.pid')
 const DAEMON_PORT_FILE = path.join(INDEXER_DIR, 'daemon.port')
+const SNAPSHOT_DB_PATH = path.join(INDEXER_DIR, 'snapshots.db')
 
 export const DEFAULT_SETTINGS = {
   QDRANT_URL: 'http://localhost:6333',
@@ -181,4 +182,8 @@ export async function readDaemonPort(): Promise<number | null> {
 export async function writeDaemonPortFile(port: number): Promise<void> {
   await ensureGlobalDirs()
   await fs.writeFile(DAEMON_PORT_FILE, String(port), 'utf8')
+}
+
+export function getSnapshotDbPath(): string {
+  return SNAPSHOT_DB_PATH
 }

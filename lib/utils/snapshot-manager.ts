@@ -2,9 +2,10 @@ import fs from 'fs/promises'
 import path from 'path'
 import crypto from 'crypto'
 import { listProjectFiles } from '../core/indexer-core.js'
+import { getProjectCollectionName } from './config-global.js'
+import * as snapshotDb from './snapshot-db.js'
 
 const SNAPSHOT_VERSION = 1
-const SNAPSHOT_FILENAME = 'snapshot.json'
 
 interface FileMetadata {
   mtimeMs: number
@@ -39,13 +40,6 @@ interface FilesToIndex {
 }
 
 /**
- * Get the snapshot file path for a project
- */
-function getSnapshotPath(projectRoot: string): string {
-  return path.join(projectRoot, '.indexer', SNAPSHOT_FILENAME)
-}
-
-/**
  * Calculate SHA1 hash of file content
  */
 async function calculateFileHash(filePath: string): Promise<string | null> {
@@ -58,45 +52,33 @@ async function calculateFileHash(filePath: string): Promise<string | null> {
 }
 
 /**
- * Load snapshot from file
+ * Load snapshot from database
  * @param projectRoot - Project root directory
  * @returns Snapshot object or null if not found
  */
 export async function loadSnapshot(projectRoot: string): Promise<Snapshot | null> {
-  const snapshotPath = getSnapshotPath(projectRoot)
+  const collectionId = getProjectCollectionName(projectRoot)
+  const files = await snapshotDb.loadSnapshot(collectionId)
 
-  try {
-    const content = await fs.readFile(snapshotPath, 'utf8')
-    const snapshot = JSON.parse(content) as Snapshot
+  if (!files) {
+    return null
+  }
 
-    // Validate snapshot structure
-    if (!snapshot.version || !snapshot.files || typeof snapshot.files !== 'object') {
-      return null
-    }
-
-    return snapshot
-  } catch (e: any) {
-    if (e.code === 'ENOENT') {
-      return null
-    }
-    throw new Error(`Failed to load snapshot: ${e.message}`)
+  return {
+    version: SNAPSHOT_VERSION,
+    timestamp: Date.now(),
+    files
   }
 }
 
 /**
- * Save snapshot to file
+ * Save snapshot to database
  * @param projectRoot - Project root directory
  * @param snapshot - Snapshot object to save
  */
 export async function saveSnapshot(projectRoot: string, snapshot: Snapshot): Promise<void> {
-  const snapshotPath = getSnapshotPath(projectRoot)
-  const snapshotDir = path.dirname(snapshotPath)
-
-  // Ensure directory exists
-  await fs.mkdir(snapshotDir, { recursive: true })
-
-  // Save snapshot
-  await fs.writeFile(snapshotPath, JSON.stringify(snapshot, null, 2), 'utf8')
+  const collectionId = getProjectCollectionName(projectRoot)
+  await snapshotDb.saveSnapshot(collectionId, snapshot.files)
 }
 
 /**
@@ -219,19 +201,12 @@ export async function getFilesToIndex(projectRoot: string): Promise<FilesToIndex
 }
 
 /**
- * Delete snapshot file for a project
+ * Delete snapshot for a project
  * @param projectRoot - Project root directory
  */
 export async function deleteSnapshot(projectRoot: string): Promise<void> {
-  const snapshotPath = getSnapshotPath(projectRoot)
-
-  try {
-    await fs.unlink(snapshotPath)
-  } catch (e: any) {
-    if (e.code !== 'ENOENT') {
-      throw new Error(`Failed to delete snapshot: ${e.message}`)
-    }
-  }
+  const collectionId = getProjectCollectionName(projectRoot)
+  await snapshotDb.deleteSnapshot(collectionId)
 }
 
 /**
@@ -240,14 +215,8 @@ export async function deleteSnapshot(projectRoot: string): Promise<void> {
  * @returns True if snapshot exists
  */
 export async function snapshotExists(projectRoot: string): Promise<boolean> {
-  const snapshotPath = getSnapshotPath(projectRoot)
-
-  try {
-    await fs.access(snapshotPath)
-    return true
-  } catch {
-    return false
-  }
+  const collectionId = getProjectCollectionName(projectRoot)
+  return await snapshotDb.snapshotExists(collectionId)
 }
 
 /**
@@ -260,15 +229,16 @@ export async function getSnapshotMetadata(projectRoot: string): Promise<{
   timestamp: number
   fileCount: number
 } | null> {
-  const snapshot = await loadSnapshot(projectRoot)
+  const collectionId = getProjectCollectionName(projectRoot)
+  const metadata = await snapshotDb.getSnapshotMetadata(collectionId)
 
-  if (!snapshot) {
+  if (!metadata) {
     return null
   }
 
   return {
-    version: snapshot.version,
-    timestamp: snapshot.timestamp,
-    fileCount: Object.keys(snapshot.files).length
+    version: SNAPSHOT_VERSION,
+    timestamp: Date.now(),
+    fileCount: metadata.fileCount
   }
 }

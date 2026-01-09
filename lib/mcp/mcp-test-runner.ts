@@ -23,28 +23,63 @@ async function executeMcpTool(startCwd: string, toolName: string, args: any = {}
   const port = await getDaemonPort()
   const url = `http://127.0.0.1:${port}/mcp`
 
-  // Inject collectionId into arguments
-  const requestArgs = {
-    ...args,
-    collectionId: collectionName
-  }
-
-  const payload = {
-    jsonrpc: '2.0',
-    id: 1,
-    method: 'tools/call',
-    params: {
-      name: toolName,
-      arguments: requestArgs
-    }
-  }
-
   try {
-    const response = await fetch(url, {
+    // Step 1: Initialize MCP session
+    const initPayload = {
+      jsonrpc: '2.0',
+      id: 1,
+      method: 'initialize',
+      params: {
+        protocolVersion: '2024-11-05',
+        capabilities: {},
+        clientInfo: {
+          name: 'indexer-test-client',
+          version: '1.0.0'
+        }
+      }
+    }
+
+    const initResponse = await fetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Accept': 'application/json, text/event-stream'
+      },
+      body: JSON.stringify(initPayload)
+    })
+
+    if (!initResponse.ok) {
+      throw new Error(`HTTP ${initResponse.status}: ${initResponse.statusText}`)
+    }
+
+    // Extract session ID from response headers
+    const sessionId = initResponse.headers.get('mcp-session-id')
+    if (!sessionId) {
+      throw new Error('No session ID received from MCP server')
+    }
+
+    // Step 2: Call the tool with session ID
+    const requestArgs = {
+      ...args,
+      collectionId: collectionName
+    }
+
+    const payload = {
+      jsonrpc: '2.0',
+      id: 2,
+      method: 'tools/call',
+      params: {
+        name: toolName,
+        arguments: requestArgs
+      }
+    }
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json, text/event-stream',
+        'Mcp-Session-Id': sessionId
       },
       body: JSON.stringify(payload)
     })
