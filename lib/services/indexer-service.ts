@@ -41,16 +41,6 @@ export async function startIndexerService(projectPathArg = null) {
   // Load config
   const config = await loadGlobalConfig()
 
-  // Start inactivity timers
-  startInactivityTimer(() => {
-    log('Inactivity timeout reached, shutting down...')
-    gracefulShutdown()
-  })
-  startHeartbeat(() => {
-    log('Heartbeat timeout reached, shutting down...')
-    gracefulShutdown()
-  })
-
   // Write PID file
   await writePidFile()
 
@@ -65,9 +55,23 @@ export async function startIndexerService(projectPathArg = null) {
     // HTTP mode: start HTTP MCP server for daemon (multi-client support)
     const port = getPortFromArgs() || DEFAULT_MCP_PORT
     await writeDaemonPortFile(port)
+
+    // Start inactivity timers only for HTTP daemon mode (skip in test mode)
+    if (process.env.NODE_ENV !== 'test') {
+      startInactivityTimer(() => {
+        log('Inactivity timeout reached, shutting down...')
+        gracefulShutdown()
+      })
+      startHeartbeat(() => {
+        log('Heartbeat timeout reached, shutting down...')
+        gracefulShutdown()
+      })
+    }
+
     await startMcpHttpServer(port)
   } else if (MCP_MODE) {
     // MCP stdio mode: start MCP server via stdio (single client)
+    // No inactivity timers - process exits when stdio closes
     await startMcpServer()
   } else {
     // Daemon mode: just run with background indexing (no MCP server)

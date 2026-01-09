@@ -23,12 +23,41 @@ import {
 const TEST_ROOT = path.resolve(process.cwd(), 'tests_daemon_proxy')
 const PROJECT_A_DIR = path.join(TEST_ROOT, 'project-a')
 const PROJECT_B_DIR = path.join(TEST_ROOT, 'project-b')
-const DAEMON_PORT = 34568 // Use non-default port to avoid conflicts
 const DAEMON_SCRIPT = path.resolve(process.cwd(), 'build/lib/services/indexer-service.js')
 
 let daemonProcess: ChildProcess | null = null
+let daemonPort: number
 let collectionIdA: string
 let collectionIdB: string
+
+/**
+ * Check if a port is available
+ */
+async function isPortAvailable(port: number): Promise<boolean> {
+  return new Promise((resolve) => {
+    const server = http.createServer()
+    server.once('error', () => {
+      resolve(false)
+    })
+    server.once('listening', () => {
+      server.close()
+      resolve(true)
+    })
+    server.listen(port, '127.0.0.1')
+  })
+}
+
+/**
+ * Find an available port starting from the given port
+ */
+async function findAvailablePort(startPort: number): Promise<number> {
+  for (let port = startPort; port < startPort + 100; port++) {
+    if (await isPortAvailable(port)) {
+      return port
+    }
+  }
+  throw new Error(`No available ports found in range ${startPort}-${startPort + 99}`)
+}
 
 /**
  * Setup test projects with different file structures
@@ -100,12 +129,12 @@ def test_main():
 /**
  * Check if daemon is ready by making a health check request
  */
-async function checkDaemonHealth(): Promise<boolean> {
+async function checkDaemonHealth(port: number): Promise<boolean> {
   return new Promise((resolve) => {
     const req = http.request(
       {
         hostname: '127.0.0.1',
-        port: DAEMON_PORT,
+        port,
         path: '/mcp',
         method: 'POST',
         headers: {
@@ -138,9 +167,11 @@ async function checkDaemonHealth(): Promise<boolean> {
  * Start daemon process
  */
 async function startDaemon(): Promise<void> {
-  console.log(`[TEST] Starting daemon on port ${DAEMON_PORT}...`)
+  // Find an available port
+  daemonPort = await findAvailablePort(34568)
+  console.log(`[TEST] Starting daemon on port ${daemonPort}...`)
 
-  daemonProcess = spawn('node', [DAEMON_SCRIPT, '--mcp-http', '--port', String(DAEMON_PORT)], {
+  daemonProcess = spawn('node', [DAEMON_SCRIPT, '--mcp-http', '--port', String(daemonPort)], {
     stdio: ['ignore', 'pipe', 'pipe'],
     env: { ...process.env, NODE_ENV: 'test' }
   })
@@ -178,7 +209,7 @@ async function startDaemon(): Promise<void> {
   for (let i = 0; i < maxAttempts; i++) {
     await new Promise(resolve => setTimeout(resolve, delayMs))
 
-    if (await checkDaemonHealth()) {
+    if (await checkDaemonHealth(daemonPort)) {
       console.log(`[TEST] Daemon is ready after ${i + 1} attempts`)
       return
     }
@@ -397,8 +428,8 @@ test.after(async () => {
 })
 
 test('Multiple clients can connect to daemon simultaneously', async () => {
-  const clientA = new McpHttpClient(DAEMON_PORT, collectionIdA)
-  const clientB = new McpHttpClient(DAEMON_PORT, collectionIdB)
+  const clientA = new McpHttpClient(daemonPort, collectionIdA)
+  const clientB = new McpHttpClient(daemonPort, collectionIdB)
 
   await clientA.initialize()
   await clientB.initialize()
@@ -412,7 +443,7 @@ test('Multiple clients can connect to daemon simultaneously', async () => {
 })
 
 test('get_project_structure returns correct structure for Project A', async () => {
-  const client = new McpHttpClient(DAEMON_PORT, collectionIdA)
+  const client = new McpHttpClient(daemonPort, collectionIdA)
   await client.initialize()
 
   const result = await client.callTool('get_project_structure', {})
@@ -439,7 +470,7 @@ test('get_project_structure returns correct structure for Project A', async () =
 })
 
 test('get_project_structure returns correct structure for Project B', async () => {
-  const client = new McpHttpClient(DAEMON_PORT, collectionIdB)
+  const client = new McpHttpClient(daemonPort, collectionIdB)
   await client.initialize()
 
   const result = await client.callTool('get_project_structure', {})
@@ -462,8 +493,8 @@ test('get_project_structure returns correct structure for Project B', async () =
 })
 
 test('Collection isolation: clients can only access their own collections', async () => {
-  const clientA = new McpHttpClient(DAEMON_PORT, collectionIdA)
-  const clientB = new McpHttpClient(DAEMON_PORT, collectionIdB)
+  const clientA = new McpHttpClient(daemonPort, collectionIdA)
+  const clientB = new McpHttpClient(daemonPort, collectionIdB)
 
   await clientA.initialize()
   await clientB.initialize()
@@ -488,8 +519,8 @@ test('Collection isolation: clients can only access their own collections', asyn
 })
 
 test('Multiple simultaneous requests from different clients', async () => {
-  const clientA = new McpHttpClient(DAEMON_PORT, collectionIdA)
-  const clientB = new McpHttpClient(DAEMON_PORT, collectionIdB)
+  const clientA = new McpHttpClient(daemonPort, collectionIdA)
+  const clientB = new McpHttpClient(daemonPort, collectionIdB)
 
   await clientA.initialize()
   await clientB.initialize()
@@ -512,7 +543,7 @@ test('Multiple simultaneous requests from different clients', async () => {
 })
 
 test('Client reconnection with new session', async () => {
-  const client = new McpHttpClient(DAEMON_PORT, collectionIdA)
+  const client = new McpHttpClient(daemonPort, collectionIdA)
 
   // First connection
   await client.initialize()
@@ -523,7 +554,7 @@ test('Client reconnection with new session', async () => {
   client.close()
 
   // Reconnect with new session
-  const client2 = new McpHttpClient(DAEMON_PORT, collectionIdA)
+  const client2 = new McpHttpClient(daemonPort, collectionIdA)
   await client2.initialize()
 
   const result2 = await client2.callTool('get_project_structure', {})

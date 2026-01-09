@@ -292,6 +292,13 @@ export async function startMcpServer(): Promise<void> {
   console.log('[mcp-service] Starting MCP server...')
   const server = createMcpServer()
   const transport = new StdioServerTransport()
+
+  // Handle transport close - exit process when connection closes
+  transport.onclose = async () => {
+    console.log('[mcp-service] Stdio transport closed, exiting...')
+    process.exit(0)
+  }
+
   await server.connect(transport)
   console.log('[mcp-service] MCP server connected via stdio')
 }
@@ -413,7 +420,16 @@ export async function startMcpHttpServer(port: number): Promise<void> {
     }
   })
 
-  await new Promise<void>((resolve) => {
+  await new Promise<void>((resolve, reject) => {
+    httpServer.on('error', (err: any) => {
+      if (err.code === 'EADDRINUSE') {
+        console.error(`[mcp-service] Port ${port} is already in use`)
+        reject(new Error(`Port ${port} is already in use. Another instance may be running.`))
+      } else {
+        reject(err)
+      }
+    })
+
     httpServer.listen(port, '127.0.0.1', () => {
       console.log(`[mcp-service] HTTP server listening on http://127.0.0.1:${port}`)
       resolve()
