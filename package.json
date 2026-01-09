@@ -37,7 +37,7 @@
     "build": "tsc && mkdir -p build/lib/utils/grammars && cp lib/utils/grammars/*.wasm build/lib/utils/grammars/ && cp lib/cli/mcp-proxy-template.js build/lib/cli/",
     "watch": "tsc --watch",
     "start": "node build/indexer.js",
-    "install-global": "npm install -g .",
+    "install-global": "npm run build && npm install -g .",
     "uninstall-global": "npm uninstall -g @dnaroid/mcp-code-indexer",
     "link": "npm link",
     "test": "npm run build && node --test build/lib/core/indexer-core.test.js build/lib/core/project-detector.test.js build/lib/mcp/mcp-tools.test.js build/lib/utils/snapshot-manager.test.js build/tests/find_usages_e2e.test.js build/tests/indexer_changes.test.js build/tests/live_search.test.js build/tests/tools_handlers.test.js build/tests/tools_real_execution.test.js build/tests/daemon_proxy_integration.test.js",
