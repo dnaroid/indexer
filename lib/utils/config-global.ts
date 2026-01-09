@@ -165,6 +165,10 @@ export function getLogFilePath() {
 }
 
 export function getDaemonPidFilePath() {
+  // In test mode, use a unique PID file per process to avoid conflicts
+  if (process.env.NODE_ENV === 'test') {
+    return path.join(INDEXER_DIR, `daemon-test-${process.pid}.pid`)
+  }
   return DAEMON_PID_FILE
 }
 

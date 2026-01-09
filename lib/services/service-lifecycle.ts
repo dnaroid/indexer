@@ -59,6 +59,11 @@ export async function writePidFile(): Promise<void> {
  * @returns True if another instance is running
  */
 export async function isAnotherInstanceRunning(): Promise<boolean> {
+  // Skip instance check in test mode
+  if (process.env.NODE_ENV === 'test') {
+    return false
+  }
+
   const pidFilePath = getDaemonPidFilePath()
 
   try {
