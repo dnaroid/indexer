@@ -35,7 +35,7 @@ import {
 import {
   renderMcpProxyScript
 } from './cli-config.js'
-import { isDaemonRunning, stopDaemon } from './daemon-manager.js'
+import { isDaemonRunning, stopDaemon, ensureDaemonRunning } from './daemon-manager.js'
 import { isQdrantUp, isOllamaUp, countIndexed } from '../managers/collection-manager.js'
 
 const __filename = fileURLToPath(import.meta.url)
@@ -371,4 +371,36 @@ export async function handleMcp(_args: string[], _startCwd: string, _projectPath
   console.error('[ERROR] Please run "indexer init" to generate the proxy script.')
   console.error('[ERROR] Then use the proxy script directly from your MCP configuration.')
   process.exit(1)
+}
+
+export async function handleStartDaemon() {
+  const running = await isDaemonRunning()
+  if (running) {
+    log('Daemon is already running.')
+    return
+  }
+
+  log('Starting daemon...')
+  try {
+    await ensureDaemonRunning()
+    log('Daemon started successfully.')
+  } catch (e: any) {
+    fail(`Failed to start daemon: ${e.message}`)
+  }
+}
+
+export async function handleStopDaemon() {
+  const running = await isDaemonRunning()
+  if (!running) {
+    log('Daemon is not running.')
+    return
+  }
+
+  log('Stopping daemon...')
+  try {
+    await stopDaemon()
+    log('Daemon stopped successfully.')
+  } catch (e: any) {
+    fail(`Failed to stop daemon: ${e.message}`)
+  }
 }

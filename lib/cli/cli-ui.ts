@@ -190,6 +190,10 @@ export function printHelp(): void {
  ` +
               `  indexer status       # show status
  ` +
+              `  indexer start        # start daemon
+ ` +
+              `  indexer stop         # stop daemon
+ ` +
               `  indexer logs         # tail daemon logs (alias: log)
  ` +
               `  indexer projects      # list all tracked projects

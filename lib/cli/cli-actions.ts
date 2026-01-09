@@ -38,5 +38,7 @@ export {
   handleLogs,
   handleUninstall,
   handleMcp,
-  handleUpdateMcp
+  handleUpdateMcp,
+  handleStartDaemon,
+  handleStopDaemon
 } from './cli-commands.js'

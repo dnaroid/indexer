@@ -27,7 +27,9 @@ import {
   handleListProjects,
   handleDeleteProject,
   handleTestCommand,
-  handleUpdateMcp
+  handleUpdateMcp,
+  handleStartDaemon,
+  handleStopDaemon
 } from './lib/cli/cli-actions.js'
 import {
   isDaemonRunning
@@ -105,6 +107,12 @@ async function interactiveMenu(): Promise<void> {
     options.push({ label: 'status      - show status', value: 'status' })
     options.push({ label: 'logs        - tail daemon logs', value: 'logs' })
 
+    if (daemonRunning) {
+      options.push({ label: 'stop        - stop daemon', value: 'stop' })
+    } else {
+      options.push({ label: 'start       - start daemon', value: 'start' })
+    }
+
     if (isInstalled) {
       options.push({ label: 'index       - force index rebuild', value: 'index' })
     }
@@ -150,6 +158,12 @@ async function interactiveMenu(): Promise<void> {
         break
       case 'uninstall':
         await handleUninstall(startCwd)
+        break
+      case 'start':
+        await handleStartDaemon()
+        break
+      case 'stop':
+        await handleStopDaemon()
         break
       case 'test':
         const testOptions: CliOption[] = [
@@ -234,6 +248,12 @@ async function main(): Promise<void> {
       break
     case 'update-mcp':
       await handleUpdateMcp(startCwd)
+      break
+    case 'start':
+      await handleStartDaemon()
+      break
+    case 'stop':
+      await handleStopDaemon()
       break
     case 'help':
     case '--help':

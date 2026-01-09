@@ -298,25 +298,15 @@ export async function startMcpServer(): Promise<void> {
 
 /**
  * Start MCP server via HTTP for daemon mode (multi-client support)
+ * Each client gets its own transport and server instance
  * @param {number} port - Port number to listen on
  * @returns {Promise<void>}
  */
 export async function startMcpHttpServer(port: number): Promise<void> {
   console.log('[mcp-service] Starting HTTP MCP server...')
-  const server = createMcpServer()
 
-  // Use stateless mode - no session ID tracking
-  // This allows multiple independent clients to connect without session conflicts
-  const transport = new StreamableHTTPServerTransport({
-    sessionIdGenerator: undefined, // Stateless mode
-    onsessioninitialized: (sessionId) => {
-      console.log(`[mcp-service] Client connected`)
-      updateActivity()
-    },
-    onsessionclosed: (sessionId) => {
-      console.log(`[mcp-service] Client disconnected`)
-    }
-  })
+  // Map to store transport/server pairs by session ID
+  const sessions = new Map<string, { transport: any, server: any }>()
 
   const httpServer = http.createServer((req, res) => {
     // Handle both GET (SSE) and POST (JSON) requests
@@ -328,7 +318,54 @@ export async function startMcpHttpServer(port: number): Promise<void> {
           try {
             updateActivity()
             const parsed = JSON.parse(body)
-            await transport.handleRequest(req, res, parsed)
+            const sessionId = req.headers['mcp-session-id'] as string | undefined
+            const isInitialize = parsed.method === 'initialize'
+
+            if (isInitialize && !sessionId) {
+              // New client - create new transport and server
+              console.log('[mcp-service] New client connecting...')
+
+              const transport = new StreamableHTTPServerTransport({
+                sessionIdGenerator: () => randomUUID(),
+                onsessioninitialized: (sid) => {
+                  console.log(`[mcp-service] Session ${sid} initialized`)
+                  updateActivity()
+                },
+                onsessionclosed: (sid) => {
+                  console.log(`[mcp-service] Session ${sid} closed`)
+                  sessions.delete(sid)
+                }
+              })
+
+              const server = createMcpServer()
+              await server.connect(transport)
+
+              // Handle the initialize request
+              await transport.handleRequest(req, res, parsed)
+
+              // Extract session ID from response headers to store the session
+              // Session ID is set during handleRequest for initialize
+              const generatedSessionId = (transport as any).sessionId
+              if (generatedSessionId) {
+                sessions.set(generatedSessionId, { transport, server })
+                console.log(`[mcp-service] Client connected with session ${generatedSessionId} (${sessions.size} active sessions)`)
+              }
+            } else if (sessionId && sessions.has(sessionId)) {
+              // Existing client - route to existing transport
+              const session = sessions.get(sessionId)!
+              await session.transport.handleRequest(req, res, parsed)
+            } else {
+              // Session not found
+              res.writeHead(404, { 'Content-Type': 'application/json' })
+              res.end(JSON.stringify({
+                jsonrpc: '2.0',
+                error: {
+                  code: -32001,
+                  message: sessionId ? 'Session not found' : 'Mcp-Session-Id header required'
+                },
+                id: null
+              }))
+            }
           } catch (err: any) {
             console.error('[mcp-service] Error handling request:', err)
             if (!res.headersSent) {
@@ -338,19 +375,34 @@ export async function startMcpHttpServer(port: number): Promise<void> {
           }
         })
       } else if (req.method === 'GET') {
-        // Handle SSE GET requests
-        try {
-          updateActivity()
-          transport.handleRequest(req, res).catch(err => {
+        // Handle SSE GET requests (not used in current proxy architecture)
+        ;(async () => {
+          try {
+            updateActivity()
+            const sessionId = req.headers['mcp-session-id'] as string | undefined
+
+            if (sessionId && sessions.has(sessionId)) {
+              const session = sessions.get(sessionId)!
+              await session.transport.handleRequest(req, res)
+            } else {
+              res.writeHead(404, { 'Content-Type': 'application/json' })
+              res.end(JSON.stringify({
+                jsonrpc: '2.0',
+                error: {
+                  code: -32001,
+                  message: 'Session not found'
+                },
+                id: null
+              }))
+            }
+          } catch (err: any) {
             console.error('[mcp-service] Error handling GET request:', err)
-          })
-        } catch (err: any) {
-          console.error('[mcp-service] Error handling GET request:', err)
-          if (!res.headersSent) {
-            res.writeHead(500)
-            res.end()
+            if (!res.headersSent) {
+              res.writeHead(500)
+              res.end()
+            }
           }
-        }
+        })()
       } else {
         res.writeHead(405)
         res.end()
@@ -368,6 +420,5 @@ export async function startMcpHttpServer(port: number): Promise<void> {
     })
   })
 
-  await server.connect(transport)
-  console.log('[mcp-service] MCP server connected via HTTP')
+  console.log('[mcp-service] MCP server ready for connections')
 }
