@@ -26,7 +26,8 @@ import {
   checkAndAutoUpdate,
   handleListProjects,
   handleDeleteProject,
-  handleTestCommand
+  handleTestCommand,
+  handleUpdateMcp
 } from './lib/cli/cli-actions.js'
 import {
   isDaemonRunning
@@ -230,6 +231,9 @@ async function main(): Promise<void> {
       break
     case 'mcp':
       await handleMcp(cleanArgs, startCwd, projectPathArg as any)
+      break
+    case 'update-mcp':
+      await handleUpdateMcp(startCwd)
       break
     case 'help':
     case '--help':

@@ -222,8 +222,11 @@ export async function handleStatus(startCwd: string) {
 }
 
 export async function handleCleanIndex(startCwd: string) {
-  const { root } = await ensureInitialized(startCwd)
+  const { root, paths } = await ensureInitialized(startCwd)
   const collectionName = getProjectCollectionName(root)
+
+  // Check if MCP proxy script is up to date
+  await checkMcpProxyActual(root, paths)
 
   const qdrantUp = await isQdrantUp(process.env.QDRANT_URL || 'http://localhost:6333')
   if (!qdrantUp) {
@@ -307,6 +310,59 @@ export async function handleUninstall(startCwd: string) {
   await removeProjectFromConfig(root)
 
   log('Removed .indexer/ and cleaned up configs.')
+}
+
+async function checkMcpProxyActual(root: string, paths: any): Promise<boolean> {
+  const currentCollectionId = getProjectCollectionName(root)
+  const mcpProxyPath = path.join(paths.dotDir, 'mcp-server.js')
+
+  try {
+    const proxyContent = await fs.readFile(mcpProxyPath, 'utf8')
+    const match = proxyContent.match(/const COLLECTION_ID = ['"]([^'"]+)['"]/)
+
+    if (match && match[1] !== currentCollectionId) {
+      warn('⚠️  MCP proxy script is outdated!')
+      warn(`   Current collectionId: ${currentCollectionId}`)
+      warn(`   Proxy collectionId:   ${match[1]}`)
+      warn('   Run "indexer update-mcp" to fix this.')
+      return false
+    }
+  } catch (e) {
+    // Proxy script doesn't exist or can't be read
+    return false
+  }
+
+  return true
+}
+
+export async function handleUpdateMcp(startCwd: string) {
+  const root = await findProjectRoot(startCwd)
+  if (!root) {
+    fail('Not inside an indexed project')
+    process.exit(1)
+  }
+
+  const paths = getPaths(root)
+
+  // Verify .indexer exists
+  if (!(await pathExists(paths.dotDir))) {
+    fail('Project not initialized. Run "indexer init" first.')
+    process.exit(1)
+  }
+
+  // Regenerate proxy script with current collectionId
+  const collectionName = getProjectCollectionName(root)
+  const mcpProxyScript = await renderMcpProxyScript(paths, collectionName)
+  const mcpProxyPath = path.join(paths.dotDir, 'mcp-server.js')
+  await fs.writeFile(mcpProxyPath, mcpProxyScript, 'utf8')
+  await fs.chmod(mcpProxyPath, 0o755)
+
+  // Update global config with current path
+  await addProjectToConfig(root)
+
+  log(`Updated MCP proxy script: ${mcpProxyPath}`)
+  log(`Collection ID: ${collectionName}`)
+  log(`Project path updated in global config`)
 }
 
 export async function handleMcp(_args: string[], _startCwd: string, _projectPathArg: string | null = null) {
