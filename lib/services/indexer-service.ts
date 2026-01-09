@@ -5,6 +5,8 @@ import {registerProject} from './project-watcher.js'
 import {startHeartbeat, startInactivityTimer, stopAllTimers} from './inactivity-manager.js'
 import {gracefulShutdown, isAnotherInstanceRunning, setupSignalHandlers, writePidFile} from './service-lifecycle.js'
 import {startMcpServer, startMcpHttpServer} from './mcp-service.js'
+import {fileURLToPath} from 'url'
+import path from 'path'
 
 // Mode flags
 const MCP_MODE = process.argv.includes('--mcp')
@@ -87,11 +89,14 @@ setupSignalHandlers(async () => {
 })
 
 // Start service when run directly
-if (import.meta.url === `file://${process.argv[1]}`) {
+const currentFilePath = fileURLToPath(import.meta.url)
+const scriptPath = path.resolve(process.argv[1])
+const isRunDirectly = currentFilePath === scriptPath
+
+if (isRunDirectly) {
   console.log('[DEBUG] indexer-service.js is being run directly')
-  console.log('[DEBUG] import.meta.url:', import.meta.url)
-  console.log('[DEBUG] process.argv[1]:', process.argv[1])
-  console.log(`[DEBUG] Condition met: import.meta.url === 'file://${process.argv[1]}'`)
+  console.log('[DEBUG] currentFilePath:', currentFilePath)
+  console.log('[DEBUG] scriptPath:', scriptPath)
   console.log('[DEBUG] MCP_MODE:', MCP_MODE)
   console.log('[DEBUG] process.argv:', process.argv)
 
@@ -110,6 +115,6 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   })
 } else {
   console.log('[DEBUG] indexer-service.js is being imported as a module, not run directly')
-  console.log('[DEBUG] import.meta.url:', import.meta.url)
-  console.log('[DEBUG] process.argv[1]:', process.argv[1])
+  console.log('[DEBUG] currentFilePath:', currentFilePath)
+  console.log('[DEBUG] scriptPath:', scriptPath)
 }
