@@ -13,6 +13,8 @@ import { searchSymbols } from '../tools/search-symbols/handler.js'
 import { getFileOutline } from '../tools/get-file-outline/handler.js'
 import { getProjectStructure } from '../tools/get-project-structure/handler.js'
 import { findUsages } from '../tools/find-usages/handler.js'
+import { getDependencyGraph } from '../tools/get-dependency-graph/handler.js'
+import { getReverseDependencies } from '../tools/get-reverse-dependencies/handler.js'
 import type { ToolHandlersDeps } from '../tools/common/types.js'
 
 export const CODEBASE_PROMPT = [
@@ -160,7 +162,9 @@ export async function executeQuery({ collectionId, tool, args }: { collectionId:
     search_symbols: (args) => searchSymbols(deps, args),
     get_file_outline: (args) => getFileOutline(deps, args),
     get_project_structure: () => getProjectStructure(deps),
-    find_usages: (args) => findUsages(deps, args)
+    find_usages: (args) => findUsages(deps, args),
+    get_dependency_graph: (args) => getDependencyGraph(deps, { ...args, collectionId }),
+    get_reverse_dependencies: (args) => getReverseDependencies(deps, { ...args, collectionId })
   }
 
   if (!handlers[tool]) {
@@ -196,6 +200,14 @@ function createMcpHandlers() {
     find_usages: async (args: any) => {
       updateActivity()
       return executeQuery({ collectionId: args.collectionId, tool: 'find_usages', args })
+    },
+    get_dependency_graph: async (args: any) => {
+      updateActivity()
+      return executeQuery({ collectionId: args.collectionId, tool: 'get_dependency_graph', args })
+    },
+    get_reverse_dependencies: async (args: any) => {
+      updateActivity()
+      return executeQuery({ collectionId: args.collectionId, tool: 'get_reverse_dependencies', args })
     }
   }
 }
@@ -295,6 +307,35 @@ export function createMcpServer() {
       }
     },
     handlers.find_usages
+  )
+
+  server.registerTool(
+    'get_dependency_graph',
+    {
+      description: 'Get dependency graph (imports) starting from a file or path prefix',
+      inputSchema: {
+        collectionId: z.string().optional().describe('Collection ID for project (injected by proxy; omit unless you are a custom client)'),
+        path: z.string().optional().describe('Starting file path to build graph from'),
+        path_prefix: z.string().optional().describe('Path prefix to match multiple files'),
+        maxDepth: z.number().optional().default(3).describe('Maximum depth of dependency traversal (default: 3)'),
+        includeExternal: z.boolean().optional().default(false).describe('Include external dependencies (npm, pip, etc.)')
+      }
+    },
+    handlers.get_dependency_graph
+  )
+
+  server.registerTool(
+    'get_reverse_dependencies',
+    {
+      description: 'Get reverse dependencies (which files import/depend on the specified file)',
+      inputSchema: {
+        collectionId: z.string().optional().describe('Collection ID for project (injected by proxy; omit unless you are a custom client)'),
+        path: z.string().describe('File path to find reverse dependencies for'),
+        maxDepth: z.number().optional().default(3).describe('Maximum depth of reverse dependency traversal (default: 3)'),
+        includeExternal: z.boolean().optional().default(false).describe('Include external dependencies (npm, pip, etc.)')
+      }
+    },
+    handlers.get_reverse_dependencies
   )
 
   return server

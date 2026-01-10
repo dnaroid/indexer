@@ -16,6 +16,7 @@ import {
   deletePointsByPath,
   getExistingFileHash
 } from './qdrant-client.js'
+import { updateDependencyGraphForFile } from './dependency-graph-builder.js'
 import type {
   FileProcessResult,
   IndexerSettings,
@@ -264,6 +265,15 @@ async function indexFile(
     }
   }
   await upsertPoints(coll, points, conf)
+
+  // Update dependency graph for this file
+  try {
+    await updateDependencyGraphForFile(root, coll, file)
+  } catch (error) {
+    // Don't fail indexing if dependency graph update fails
+    console.error(`Failed to update dependency graph for ${file}:`, error)
+  }
+
   return { indexed: true, chunks: processedCount }
 }
 

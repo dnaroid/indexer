@@ -350,3 +350,148 @@ export async function isCodeAtPosition(code: string, langName: string, line: num
 
   return true
 }
+
+export interface ImportInfo {
+  source: string
+  importType: 'import' | 'from' | 'using' | 'using_static'
+  names: string[]
+  line: number
+  isTypeOnly: boolean
+}
+
+/**
+ * Extract import statements from Python source
+ */
+export async function extractPythonImports(code: string): Promise<ImportInfo[]> {
+  const imports: ImportInfo[] = []
+
+  const lang = await loadLanguage('python')
+  parser.setLanguage(lang)
+  const tree = parser.parse(code)
+  if (!tree) return imports
+
+  walk(tree.rootNode, (node) => {
+    // import module1, module2
+    if (node.type === 'import_statement') {
+      const line = node.startPosition.row + 1
+      const nameNodes = node.descendantsOfType('dotted_name').concat(node.descendantsOfType('aliased_import'))
+
+      for (const nameNode of nameNodes) {
+        let moduleName = ''
+        let alias = ''
+
+        if (nameNode.type === 'dotted_name') {
+          moduleName = nameNode.text
+        } else if (nameNode.type === 'aliased_import') {
+          const nameChild = nameNode.childForFieldName('name')
+          const aliasChild = nameNode.childForFieldName('alias')
+          moduleName = nameChild?.text || ''
+          alias = aliasChild?.text || moduleName
+        }
+
+        if (moduleName) {
+          imports.push({
+            source: moduleName,
+            importType: 'import',
+            names: [alias || moduleName],
+            line,
+            isTypeOnly: false
+          })
+        }
+      }
+    }
+
+    // from module import name1, name2
+    if (node.type === 'import_from_statement') {
+      const line = node.startPosition.row + 1
+      const moduleNode = node.childForFieldName('module_name')
+      const moduleName = moduleNode?.text || ''
+
+      // Handle relative imports: from . import X, from .. import Y
+      const dots = node.children.filter((c: any) => c.text === '.' || c.text === '...')
+      const relativePrefix = dots.map((d: any) => d.text).join('')
+
+      const source = relativePrefix + moduleName
+
+      // Extract imported names
+      const names: string[] = []
+      const wildcardImport = node.children.some((c: any) => c.text === '*')
+
+      if (wildcardImport) {
+        imports.push({
+          source,
+          importType: 'from',
+          names: ['*'],
+          line,
+          isTypeOnly: false
+        })
+      } else {
+        const importedNames = node.descendantsOfType('dotted_name').concat(node.descendantsOfType('aliased_import'))
+
+        for (const nameNode of importedNames) {
+          if (nameNode.type === 'dotted_name') {
+            // Skip if this is the module name itself
+            if (nameNode.equals(moduleNode)) continue
+            names.push(nameNode.text)
+          } else if (nameNode.type === 'aliased_import') {
+            const aliasChild = nameNode.childForFieldName('alias')
+            names.push(aliasChild?.text || nameNode.childForFieldName('name')?.text || '')
+          }
+        }
+
+        if (names.length > 0) {
+          imports.push({
+            source,
+            importType: 'from',
+            names,
+            line,
+            isTypeOnly: false
+          })
+        }
+      }
+    }
+  })
+
+  return imports
+}
+
+/**
+ * Extract using directives from C# source
+ */
+export async function extractCSharpImports(code: string): Promise<ImportInfo[]> {
+  const imports: ImportInfo[] = []
+
+  const lang = await loadLanguage('csharp')
+  parser.setLanguage(lang)
+  const tree = parser.parse(code)
+  if (!tree) return imports
+
+  walk(tree.rootNode, (node) => {
+    // using System;
+    // using System.Collections.Generic;
+    if (node.type === 'using_directive') {
+      const line = node.startPosition.row + 1
+
+      // Check if it's a static using
+      const isStatic = node.children.some((c: any) => c.text === 'static')
+
+      // Extract the namespace/type name
+      const nameNode = node.descendantsOfType('qualified_name')[0] ||
+                       node.descendantsOfType('identifier')[0]
+
+      if (nameNode) {
+        const namespaceName = nameNode.text
+
+        imports.push({
+          source: namespaceName,
+          importType: isStatic ? 'using_static' : 'using',
+          names: [],
+          line,
+          isTypeOnly: false
+        })
+      }
+    }
+  })
+
+  return imports
+}

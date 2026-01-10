@@ -18,6 +18,7 @@ import {
   deleteSnapshot
 } from '../utils/snapshot-manager.js'
 import { updateActivity } from './inactivity-manager.js'
+import { deleteFileFromGraph } from '../utils/dependency-graph-db.js'
 import type { IndexerSettings } from '../types/index.js'
 
 // Always ignore these patterns for project-level watcher
@@ -192,6 +193,12 @@ async function syncProjectWithDiff(projectPath, forceFullSync = false) {
     if (filesToRemove.length > 0) {
       for (const filePath of filesToRemove) {
         await deletePointsByPath(projectConf.collectionName, filePath, projectConf.settings)
+        // Also remove from dependency graph
+        try {
+          await deleteFileFromGraph(projectConf.collectionName, filePath)
+        } catch (error) {
+          console.error(`Failed to remove ${filePath} from dependency graph:`, error)
+        }
       }
       log(`Removed ${filesToRemove.length} deleted files from index`)
     }

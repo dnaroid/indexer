@@ -350,3 +350,144 @@ export function isJSCodeAtPosition(code: string, line: number, column: number): 
 
   return !isString
 }
+
+export interface ImportInfo {
+  source: string
+  importType: 'default' | 'named' | 'namespace' | 'dynamic' | 'require'
+  names: string[]
+  line: number
+  isTypeOnly: boolean
+}
+
+/**
+ * Extract import statements from JS/TS source
+ */
+export function extractImports(code: string): ImportInfo[] {
+  const imports: ImportInfo[] = []
+
+  let ast: Node | null = null
+  try {
+    ast = parse(code, {
+      sourceType: 'module',
+      plugins: [
+        'typescript',
+        'jsx',
+        'classProperties',
+        'classPrivateProperties',
+        'classPrivateMethods',
+        'dynamicImport'
+      ]
+    })
+  } catch {
+    return imports
+  }
+
+  traverse(ast, {
+    ImportDeclaration(path: NodePath<any>) {
+      if (!path.node.source || !path.node.loc) return
+
+      const source = path.node.source.value
+      const isTypeOnly = path.node.importKind === 'type'
+      const specifiers = path.node.specifiers || []
+
+      if (specifiers.length === 0) {
+        // Side-effect import: import 'module'
+        imports.push({
+          source,
+          importType: 'named',
+          names: [],
+          line: path.node.loc.start.line,
+          isTypeOnly
+        })
+        return
+      }
+
+      for (const spec of specifiers) {
+        if (spec.type === 'ImportDefaultSpecifier') {
+          // import X from 'module'
+          imports.push({
+            source,
+            importType: 'default',
+            names: [spec.local.name],
+            line: path.node.loc.start.line,
+            isTypeOnly
+          })
+        } else if (spec.type === 'ImportNamespaceSpecifier') {
+          // import * as X from 'module'
+          imports.push({
+            source,
+            importType: 'namespace',
+            names: [spec.local.name],
+            line: path.node.loc.start.line,
+            isTypeOnly
+          })
+        } else if (spec.type === 'ImportSpecifier') {
+          // import { a, b } from 'module'
+          const isSpecTypeOnly = (spec as any).importKind === 'type'
+          const importedName = spec.imported.type === 'Identifier'
+            ? spec.imported.name
+            : (spec.imported as any).value
+          const localName = spec.local.name
+
+          const existingImport = imports.find(
+            (imp) =>
+              imp.source === source &&
+              imp.importType === 'named' &&
+              imp.line === path.node.loc.start.line &&
+              imp.isTypeOnly === (isTypeOnly || isSpecTypeOnly)
+          )
+
+          if (existingImport) {
+            existingImport.names.push(localName)
+          } else {
+            imports.push({
+              source,
+              importType: 'named',
+              names: [localName],
+              line: path.node.loc.start.line,
+              isTypeOnly: isTypeOnly || isSpecTypeOnly
+            })
+          }
+        }
+      }
+    },
+
+    CallExpression(path: NodePath<any>) {
+      if (!path.node.loc) return
+
+      // Dynamic import: import('module')
+      if (path.node.callee.type === 'Import') {
+        const arg = path.node.arguments[0]
+        if (arg && arg.type === 'StringLiteral') {
+          imports.push({
+            source: arg.value,
+            importType: 'dynamic',
+            names: [],
+            line: path.node.loc.start.line,
+            isTypeOnly: false
+          })
+        }
+        return
+      }
+
+      // CommonJS require: require('module')
+      if (
+        path.node.callee.type === 'Identifier' &&
+        path.node.callee.name === 'require'
+      ) {
+        const arg = path.node.arguments[0]
+        if (arg && arg.type === 'StringLiteral') {
+          imports.push({
+            source: arg.value,
+            importType: 'require',
+            names: [],
+            line: path.node.loc.start.line,
+            isTypeOnly: false
+          })
+        }
+      }
+    }
+  })
+
+  return imports
+}
