@@ -34,3 +34,6 @@ GEMINI.md
 /AGENTS/
 .geminiignore
 .indexer/
+AGENTS/
+.plans/
+install.js
