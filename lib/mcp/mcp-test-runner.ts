@@ -302,6 +302,38 @@ export async function handleTestFindUsages(startCwd: string): Promise<void> {
 }
 
 /**
+ * Test get_dependency_graph tool
+ * @param {string} startCwd - Starting directory
+ * @returns {Promise<void>}
+ */
+export async function handleTestDependencyGraph(startCwd: string): Promise<void> {
+  const { root, paths } = await ensureInitialized(startCwd)
+  const mcpProxyPath = path.join(paths.dotDir, 'mcp-server.js')
+
+  if (!(await pathExists(mcpProxyPath))) {
+    fail('MCP proxy script not found. Please run "indexer init" first.')
+  }
+
+  log('Testing get_dependency_graph...')
+  log('Parameters: {}')
+
+  try {
+    const result = await executeMcpTool(startCwd, 'get_dependency_graph', {})
+
+    console.log('\n[RESULT] Success')
+    if (result.content && result.content[0]) {
+      const data = JSON.parse(result.content[0].text)
+      console.log(`[DATA] Found ${data.stats.totalNodes} nodes and ${data.stats.totalEdges} edges:\n`)
+      console.log(JSON.stringify(data, null, 2))
+    } else {
+      console.log('[DATA] No results returned')
+    }
+  } catch (e: any) {
+    console.error(`\n[ERROR] ${e.message}`)
+  }
+}
+
+/**
  * Run all MCP tests
  * @param {string} startCwd - Starting directory
  * @returns {Promise<void>}
@@ -320,7 +352,8 @@ export async function handleTestAll(startCwd: string): Promise<void> {
     { name: 'search_symbols', fn: handleTestSearchSymbols },
     { name: 'get_file_outline', fn: handleTestGetFileOutline },
     { name: 'get_project_structure', fn: handleTestGetProjectStructure },
-    { name: 'find_usages', fn: handleTestFindUsages }
+    { name: 'find_usages', fn: handleTestFindUsages },
+    { name: 'get_dependency_graph', fn: handleTestDependencyGraph }
   ]
 
   const results: Array<{ name: string, status: string, error?: string }> = []
@@ -377,6 +410,10 @@ export async function handleTestCommand(startCwd: string, toolName?: string): Pr
     'structure': 'get_project_structure',
     'find_usages': 'find_usages',
     'usages': 'find_usages',
+    'get_dependency_graph': 'get_dependency_graph',
+    'dependency_graph': 'get_dependency_graph',
+    'dependency-graph': 'get_dependency_graph',
+    'graph': 'get_dependency_graph',
     'all': 'all'
   }
 
@@ -389,6 +426,7 @@ export async function handleTestCommand(startCwd: string, toolName?: string): Pr
     console.log('  get_file_outline (or outline)  - Get file structure')
     console.log('  get_project_structure (or structure)  - Get project tree')
     console.log('  find_usages (or usages)      - Find symbol usages')
+    console.log('  get_dependency_graph (or dependency_graph, dependency-graph, graph)  - Get dependency graph')
     console.log('  all                           - Run all tests')
     console.log('')
     fail(`Unknown tool: ${toolName || 'none specified'}`)
@@ -411,6 +449,9 @@ export async function handleTestCommand(startCwd: string, toolName?: string): Pr
       break
     case 'find_usages':
       await handleTestFindUsages(startCwd)
+      break
+    case 'get_dependency_graph':
+      await handleTestDependencyGraph(startCwd)
       break
     case 'all':
       await handleTestAll(startCwd)

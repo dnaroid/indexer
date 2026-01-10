@@ -207,14 +207,16 @@ export function printHelp(): void {
               `  indexer mcp          # run MCP server (internal usage)\n\n` +
               `MCP Test Tools (after init):\n` +
               `  indexer test search_codebase  # test semantic search
- ` +
+  ` +
               `  indexer test search_symbols    # test symbol search
- ` +
+  ` +
               `  indexer test get_file_outline # test file outline
- ` +
+  ` +
               `  indexer test get_project_structure # test project tree
- ` +
+  ` +
               `  indexer test find_usages      # test find usages
- ` +
+  ` +
+              `  indexer test dependency-graph # test dependency graph
+  ` +
               `  indexer test all              # run all tests\n`)
 }

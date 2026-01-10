@@ -25,6 +25,7 @@ export {
   handleTestGetFileOutline,
   handleTestGetProjectStructure,
   handleTestFindUsages,
+  handleTestDependencyGraph,
   handleTestAll,
   handleTestCommand
 } from '../mcp/mcp-test-runner.js'

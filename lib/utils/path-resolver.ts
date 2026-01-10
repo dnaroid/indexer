@@ -202,6 +202,15 @@ async function resolvePackageJsonImports(
 }
 
 /**
+ * Strip .js/.jsx extension from path
+ */
+function stripJSExtension(pathStr: string): string {
+  if (pathStr.endsWith('.js')) return pathStr.slice(0, -3)
+  if (pathStr.endsWith('.jsx')) return pathStr.slice(0, -4)
+  return pathStr
+}
+
+/**
  * Resolve JavaScript/TypeScript import
  */
 async function resolveJSImport(
@@ -217,7 +226,13 @@ async function resolveJSImport(
     const absolutePath = path.resolve(sourceDir, specifier)
     const relativePath = path.relative(projectRoot, absolutePath)
 
-    const resolvedPath = await findFileWithExtensions(absolutePath, extensions)
+    let resolvedPath = await findFileWithExtensions(absolutePath, extensions)
+
+    // If not found and ends with .js/.jsx, try stripping extension (to find .ts/.tsx)
+    if (!resolvedPath && (absolutePath.endsWith('.js') || absolutePath.endsWith('.jsx'))) {
+      const pathWithoutExt = stripJSExtension(absolutePath)
+      resolvedPath = await findFileWithExtensions(pathWithoutExt, extensions)
+    }
 
     if (resolvedPath) {
       const finalRelativePath = path.relative(projectRoot, resolvedPath)
@@ -240,7 +255,14 @@ async function resolveJSImport(
   // 2. Check tsconfig paths alias
   const tsAliasPath = await resolveTsConfigAlias(specifier, projectRoot)
   if (tsAliasPath) {
-    const resolvedPath = await findFileWithExtensions(tsAliasPath, extensions)
+    let resolvedPath = await findFileWithExtensions(tsAliasPath, extensions)
+    
+    // Also try stripping extension for aliases
+    if (!resolvedPath && (tsAliasPath.endsWith('.js') || tsAliasPath.endsWith('.jsx'))) {
+      const pathWithoutExt = stripJSExtension(tsAliasPath)
+      resolvedPath = await findFileWithExtensions(pathWithoutExt, extensions)
+    }
+
     if (resolvedPath) {
       const relativePath = path.relative(projectRoot, resolvedPath)
       return {
@@ -255,7 +277,14 @@ async function resolveJSImport(
   // 3. Check package.json imports
   const pkgImportPath = await resolvePackageJsonImports(specifier, projectRoot)
   if (pkgImportPath) {
-    const resolvedPath = await findFileWithExtensions(pkgImportPath, extensions)
+    let resolvedPath = await findFileWithExtensions(pkgImportPath, extensions)
+
+    // Also try stripping extension for package imports
+    if (!resolvedPath && (pkgImportPath.endsWith('.js') || pkgImportPath.endsWith('.jsx'))) {
+      const pathWithoutExt = stripJSExtension(pkgImportPath)
+      resolvedPath = await findFileWithExtensions(pathWithoutExt, extensions)
+    }
+
     if (resolvedPath) {
       const relativePath = path.relative(projectRoot, resolvedPath)
       return {

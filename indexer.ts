@@ -183,6 +183,7 @@ async function interactiveMenu(): Promise<void> {
           { label: 'get_file_outline', value: 'get_file_outline' },
           { label: 'get_project_structure', value: 'get_project_structure' },
           { label: 'find_usages', value: 'find_usages' },
+          { label: 'dependency_graph', value: 'dependency-graph' },
           { label: 'all', value: 'all' },
           { label: 'back', value: 'back' }
         ]
