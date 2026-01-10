@@ -15,6 +15,9 @@ import { getProjectStructure } from '../tools/get-project-structure/handler.js'
 import { findUsages } from '../tools/find-usages/handler.js'
 import { getDependencyGraph } from '../tools/get-dependency-graph/handler.js'
 import { getReverseDependencies } from '../tools/get-reverse-dependencies/handler.js'
+import { lspDocumentSymbols } from '../tools/lsp-document-symbols/handler.js'
+import { lspDefinition } from '../tools/lsp-definition/handler.js'
+import { lspReferences } from '../tools/lsp-references/handler.js'
 import type { ToolHandlersDeps } from '../tools/common/types.js'
 
 export const CODEBASE_PROMPT = [
@@ -164,7 +167,10 @@ export async function executeQuery({ collectionId, tool, args }: { collectionId:
     get_project_structure: () => getProjectStructure(deps),
     find_usages: (args) => findUsages(deps, args),
     get_dependency_graph: (args) => getDependencyGraph(deps, { ...args, collectionId }),
-    get_reverse_dependencies: (args) => getReverseDependencies(deps, { ...args, collectionId })
+    get_reverse_dependencies: (args) => getReverseDependencies(deps, { ...args, collectionId }),
+    lsp_document_symbols: (args) => lspDocumentSymbols(deps, args),
+    lsp_definition: (args) => lspDefinition(deps, args),
+    lsp_references: (args) => lspReferences(deps, args)
   }
 
   if (!handlers[tool]) {
@@ -208,15 +214,27 @@ function createMcpHandlers() {
     get_reverse_dependencies: async (args: any) => {
       updateActivity()
       return executeQuery({ collectionId: args.collectionId, tool: 'get_reverse_dependencies', args })
+    },
+    lsp_document_symbols: async (args: any) => {
+      updateActivity()
+      return executeQuery({ collectionId: args.collectionId, tool: 'lsp_document_symbols', args })
+    },
+    lsp_definition: async (args: any) => {
+      updateActivity()
+      return executeQuery({ collectionId: args.collectionId, tool: 'lsp_definition', args })
+    },
+    lsp_references: async (args: any) => {
+      updateActivity()
+      return executeQuery({ collectionId: args.collectionId, tool: 'lsp_references', args })
     }
   }
 }
 
 /**
  * Create MCP server instance
- * @returns {McpServer} MCP server instance
+ * @returns {Promise<McpServer>} MCP server instance
  */
-export function createMcpServer() {
+export async function createMcpServer() {
   const handlers = createMcpHandlers()
 
   const server = new McpServer({
@@ -338,6 +356,63 @@ export function createMcpServer() {
     handlers.get_reverse_dependencies
   )
 
+  // LSP tools (conditionally enabled)
+  // Note: We load config synchronously here since createMcpServer is not async
+  // Config should already be loaded by the time this is called
+  try {
+    const config = await loadGlobalConfig()
+    const lspEnabled = config.lsp?.enabled !== false
+
+    if (lspEnabled) {
+      server.registerTool(
+        'lsp_document_symbols',
+        {
+          description: 'Get list of symbols (classes, methods, functions) in a file via LSP',
+          inputSchema: {
+            collectionId: z.string().optional().describe('Collection ID (injected by proxy)'),
+            path: z.string().describe('File path relative to project root'),
+            language: z.string().optional().describe('Language hint (typescript, javascript). Auto-detected if omitted.')
+          }
+        },
+        handlers.lsp_document_symbols
+      )
+
+      server.registerTool(
+        'lsp_definition',
+        {
+          description: 'Go to definition of a symbol at a specific position via LSP',
+          inputSchema: {
+            collectionId: z.string().optional().describe('Collection ID (injected by proxy)'),
+            path: z.string().describe('File path relative to project root'),
+            line: z.number().describe('Line number (1-based)'),
+            column: z.number().describe('Column number (1-based)'),
+            language: z.string().optional().describe('Language hint')
+          }
+        },
+        handlers.lsp_definition
+      )
+
+      server.registerTool(
+        'lsp_references',
+        {
+          description: 'Find all references to a symbol at a specific position via LSP',
+          inputSchema: {
+            collectionId: z.string().optional().describe('Collection ID (injected by proxy)'),
+            path: z.string().describe('File path relative to project root'),
+            line: z.number().describe('Line number (1-based)'),
+            column: z.number().describe('Column number (1-based)'),
+            includeDeclaration: z.boolean().optional().default(false).describe('Include declaration in results'),
+            maxResults: z.number().optional().default(200).describe('Maximum number of results'),
+            language: z.string().optional().describe('Language hint')
+          }
+        },
+        handlers.lsp_references
+      )
+    }
+  } catch (err) {
+    console.error('[mcp-service] Failed to check LSP config, LSP tools will not be registered:', err)
+  }
+
   return server
 }
 
@@ -347,7 +422,7 @@ export function createMcpServer() {
  */
 export async function startMcpServer(): Promise<void> {
   console.log('[mcp-service] Starting MCP server...')
-  const server = createMcpServer()
+  const server = await createMcpServer()
   const transport = new StdioServerTransport()
 
   // Handle transport close - exit process when connection closes
@@ -401,7 +476,7 @@ export async function startMcpHttpServer(port: number): Promise<void> {
                 }
               })
 
-              const server = createMcpServer()
+              const server = await createMcpServer()
               await server.connect(transport)
 
               // Handle the initialize request

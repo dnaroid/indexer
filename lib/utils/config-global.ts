@@ -21,7 +21,26 @@ export const DEFAULT_SETTINGS = {
   MAX_FILE_BYTES: 2 * 1024 * 1024,
   TOP_K_DEFAULT: 10,
   SCORE_THRESHOLD: 0.2,
-  SERVICE_PORT: 34567
+  SERVICE_PORT: 34567,
+  LSP_ENABLED: true,
+  LSP_IDLE_TIMEOUT_MS: 300000,      // 5 minutes
+  LSP_REQUEST_TIMEOUT_MS: 30000,    // 30 seconds
+  LSP_CACHE_ENABLED: true,
+  LSP_CACHE_DOCUMENT_SYMBOLS_TTL: 300000,  // 5 minutes
+  LSP_CACHE_DEFINITION_TTL: 60000,         // 1 minute
+  LSP_CACHE_REFERENCES_TTL: 30000,         // 30 seconds
+  LSP_SERVERS: {
+    typescript: {
+      command: 'typescript-language-server',
+      args: ['--stdio'],
+      initializationOptions: {}
+    },
+    javascript: {
+      command: 'typescript-language-server',
+      args: ['--stdio'],
+      initializationOptions: {}
+    }
+  }
 }
 
 async function ensureGlobalDirs() {
@@ -101,7 +120,13 @@ export async function loadGlobalConfig() {
       // File doesn't exist, return default config
       return {
         projects: {}, // path -> { collectionName, settings }
-        logging: { enabled: true, level: 'info' }
+        logging: { enabled: true, level: 'info' },
+        lsp: {
+          enabled: DEFAULT_SETTINGS.LSP_ENABLED,
+          idleTimeoutMs: DEFAULT_SETTINGS.LSP_IDLE_TIMEOUT_MS,
+          requestTimeoutMs: DEFAULT_SETTINGS.LSP_REQUEST_TIMEOUT_MS,
+          servers: DEFAULT_SETTINGS.LSP_SERVERS
+        }
       }
     }
     // For JSON parse errors or other errors, throw to allow caller to handle

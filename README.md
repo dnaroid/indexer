@@ -74,13 +74,37 @@ Alternatively, you can run Qdrant manually. The indexer will connect to `localho
 docker run -d -p 6333:6333 -v qdrant_data:/qdrant/storage qdrant/qdrant
 ```
 
+### 4. TypeScript Language Server (Optional, for LSP features)
+Enables precise code intelligence features like go-to-definition and find-references.
+
+- **Install globally:**
+  ```bash
+  npm install -g typescript-language-server typescript
+  ```
+- **Verify:**
+  ```bash
+  typescript-language-server --version
+  ```
+
+**Note:** LSP features are enabled by default but gracefully degrade if the language server is not installed. You can disable LSP in `~/.indexer/config.json` by setting `lsp.enabled: false`.
+
 ## Available Tools (MCP)
 
+### Semantic Search & Navigation
 - `search_codebase`: Conceptual search (e.g., "how is auth handled?").
 - `search_symbols`: Locate specific class or method definitions.
 - `get_file_outline`: See classes and methods in a file without reading all its code.
 - `get_project_structure`: Recursive visual file tree.
-- `find_references`: Find all places where a symbol is used.
+- `find_usages`: Find all places where a symbol is used (text-based via ripgrep).
+- `get_dependency_graph`: Analyze imports/dependencies starting from a file or path prefix.
+- `get_reverse_dependencies`: Find which files import/depend on a specific file.
+
+### LSP-Powered Tools (TypeScript/JavaScript)
+Requires `typescript-language-server` to be installed (see Prerequisites).
+
+- `lsp_document_symbols`: Get precise AST-based list of all symbols in a file (classes, methods, interfaces, types).
+- `lsp_definition`: Go to the exact definition of a symbol at a cursor position (line/column).
+- `lsp_references`: Find all references to a symbol with precise location information.
 
 ## CLI Commands
 
@@ -117,7 +141,7 @@ The codebase is organized into modular components with clear responsibilities, g
 - `service-lifecycle.js` - Service lifecycle management (start/stop/shutdown)
 - `inactivity-manager.js` - Activity tracking and inactivity timers
 - `project-watcher.js` - File watching and project synchronization
-- `mcp-service.js` - MCP server creation and request handling
+- `mcp-service.js` - Main MCP server implementation and request handling
 - `indexer-service.js` - Main indexer service coordinator
 
 **Core Layer** (`lib/core/`):
@@ -126,12 +150,12 @@ The codebase is organized into modular components with clear responsibilities, g
 - `file-filters.js` - File filtering and ignore patterns
 - `indexer-core.js` - Core indexing operations coordinator
 - `project-detector.js` - Project type detection
+- `dependency-graph-builder.js` - Builds and updates import dependency graphs
 
 **MCP Layer** (`lib/mcp/`):
-- `mcp-server.js` - MCP server implementation
-- `mcp-tools.js` - MCP tool implementations
-- `mcp-handlers.js` - MCP request handlers
-- `mcp-test-runner.js` - MCP tool testing utilities
+- `mcp-tools.test.js` - MCP tool testing utilities
+- `mcp-test-runner.js` - MCP tool testing runner
+- (Legacy) `mcp-server.js` - Deprecated adapter, logic moved to `lib/services/mcp-service.js`
 
 **Managers Layer** (`lib/managers/`):
 - `project-manager.js` - Project registration and management
@@ -140,6 +164,7 @@ The codebase is organized into modular components with clear responsibilities, g
 **Utils Layer** (`lib/utils/`):
 - `config-global.js` - Global configuration management
 - `snapshot-manager.js` - File system snapshot management
+- `dependency-graph-db.js` - SQLite database for dependency graph storage
 - `tree-sitter.js` - Tree-sitter parser integration
 - `ast-js.js` - JavaScript AST parser
 - `system-check.js` - System requirements checker
@@ -152,6 +177,73 @@ The daemon monitors the global configuration file and automatically:
 - **Handles errors gracefully** - if `config.json` contains invalid JSON, the error is logged but the daemon continues running without modifying projects
 
 This means you can add or remove projects by editing `~/.indexer/config.json` directly, and the daemon will automatically pick up the changes without requiring a restart.
+
+## LSP Configuration
+
+The Language Server Protocol (LSP) integration provides precise code intelligence features. Configuration is stored in `~/.indexer/config.json` under the `lsp` section.
+
+### Default Configuration
+
+```json
+{
+  "lsp": {
+    "enabled": true,
+    "idleTimeoutMs": 300000,
+    "requestTimeoutMs": 30000,
+    "servers": {
+      "typescript": {
+        "command": "typescript-language-server",
+        "args": ["--stdio"],
+        "initializationOptions": {}
+      },
+      "javascript": {
+        "command": "typescript-language-server",
+        "args": ["--stdio"],
+        "initializationOptions": {}
+      }
+    }
+  }
+}
+```
+
+### Configuration Options
+
+- **`enabled`** (boolean, default: `true`): Enable/disable LSP features globally
+- **`idleTimeoutMs`** (number, default: `300000`): Time in milliseconds before an idle LSP server is shut down (5 minutes)
+- **`requestTimeoutMs`** (number, default: `30000`): Timeout for individual LSP requests (30 seconds)
+- **`servers`** (object): Language-specific LSP server configurations
+
+### Adding Support for Other Languages
+
+To add support for additional languages (Python, C++, etc.), add entries to the `servers` object:
+
+```json
+{
+  "lsp": {
+    "servers": {
+      "python": {
+        "command": "pyright-langserver",
+        "args": ["--stdio"],
+        "initializationOptions": {}
+      },
+      "cpp": {
+        "command": "clangd",
+        "args": [],
+        "initializationOptions": {}
+      }
+    }
+  }
+}
+```
+
+Make sure the corresponding language server is installed and available in your PATH.
+
+### Session Management
+
+- LSP servers are started **lazily** on first request for a language
+- Sessions are **cached** per project and language combination
+- Idle sessions are **automatically closed** after the configured timeout
+- Failed servers are **retried** on next request
 
 ## Development
 
