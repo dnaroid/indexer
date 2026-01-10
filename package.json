@@ -41,7 +41,7 @@
     "uninstall-global": "npm uninstall -g @dnaroid/mcp-code-indexer",
     "link": "npm link",
     "pretest": "bash scripts/cleanup-before-tests.sh",
-    "test": "npm run build && node --test build/lib/core/indexer-core.test.js build/lib/core/project-detector.test.js build/lib/mcp/mcp-tools.test.js build/lib/utils/snapshot-manager.test.js build/lib/utils/fake-code-agent.test.js build/lib/utils/dependency-graph-db.test.js build/lib/utils/ast-js.test.js build/lib/utils/path-resolver.test.js build/tests/find_usages_e2e.test.js build/tests/indexer_changes.test.js build/tests/live_search.test.js build/tests/tools_handlers.test.js build/tests/tools_real_execution.test.js build/tests/daemon_proxy_integration.test.js build/tests/daemon_proxy_autostart.test.js",
+    "test": "npm run build && node scripts/run_tests.js",
     "prepublishOnly": "npm run build && npm test",
     "release": "npm version patch && git push --follow-tags && npm publish",
     "typecheck": "tsc --noEmit",
