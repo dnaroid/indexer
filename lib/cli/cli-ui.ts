@@ -144,7 +144,6 @@ export async function pickOption(options: Option[], initial: number = 0): Promis
       } catch (e) {
         process.stdout.write(`\u001b[${linesCount}A\u001b[0J\n`)
       }
-
       // Show cursor last to ensure it persists
       restoreTerminal()
     }
