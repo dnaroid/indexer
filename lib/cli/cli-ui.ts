@@ -1,15 +1,14 @@
-import readline from 'readline'
-import { createInterface } from 'readline/promises'
-import { stdin as input, stdout as output } from 'node:process'
-import { writeSync } from 'fs'
-import fs from 'fs'
-import path from 'path'
-import { fileURLToPath } from 'url'
+import readline from "readline"
+import {createInterface} from "readline/promises"
+import {stdin as input, stdout as output} from "node:process"
+import fs, {writeSync} from "fs"
+import path from "path"
+import {fileURLToPath} from "url"
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
-const pkgPath = path.resolve(__dirname, '../../../package.json')
-const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf-8'))
+const pkgPath = path.resolve(__dirname, "../../../package.json")
+const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf-8"))
 
 let terminalRestored = false
 
@@ -25,11 +24,11 @@ export function restoreTerminal(): void {
 
   // Always try to show cursor directly to stdout fd (1)
   try {
-    writeSync(1, '\x1b[?25h')
+    writeSync(1, "\x1b[?25h")
   } catch (e) {
     // Fallback
     try {
-      process.stdout.write('\x1b[?25h')
+      process.stdout.write("\x1b[?25h")
     } catch (e2) {}
   }
 
@@ -52,10 +51,10 @@ export function fail(msg: string, code: number = 1): never {
 }
 
 export async function confirmAction(question: string): Promise<boolean> {
-  const rl = createInterface({ input, output })
-  const answer = await rl.question(question + ' (y/N): ')
+  const rl = createInterface({input, output})
+  const answer = await rl.question(question + " (y/N): ")
   rl.close()
-  return answer.trim().toLowerCase() === 'y'
+  return answer.trim().toLowerCase() === "y"
 }
 
 export function printBanner(): void {
@@ -81,25 +80,25 @@ export async function pickOption(options: Option[], initial: number = 0): Promis
   terminalRestored = false
 
   if (!process.stdin.isTTY) {
-    console.log('Select action:')
+    console.log("Select action:")
     options.forEach((o, i) => console.log(`  ${i + 1}) ${o.label}`))
-    const rl = createInterface({ input, output })
+    const rl = createInterface({input, output})
     const answer = (await rl.question(`Choice [1-${options.length}]: `)).trim().toLowerCase()
     rl.close()
-    if (answer === 'exit' || answer === 'quit') {
-      return 'exit'
+    if (answer === "exit" || answer === "quit") {
+      return "exit"
     }
     const n = Number(answer)
     if (Number.isInteger(n) && n >= 1 && n <= options.length) {
       return options[n - 1].value
     }
-    return 'exit'
+    return "exit"
   }
 
   return await new Promise((resolve) => {
     readline.emitKeypressEvents(process.stdin)
     const wasRaw = process.stdin.isRaw
-    const wasPaused = typeof process.stdin.isPaused === 'function' ? process.stdin.isPaused() : undefined
+    const wasPaused = typeof process.stdin.isPaused === "function" ? process.stdin.isPaused() : undefined
     if (process.stdin.isTTY) {
       process.stdin.setRawMode(true)
     }
@@ -107,7 +106,7 @@ export async function pickOption(options: Option[], initial: number = 0): Promis
       process.stdin.resume()
     }
     // Hide cursor
-    process.stdout.write('\x1b[?25l')
+    process.stdout.write("\x1b[?25l")
 
     let idx = initial
     let firstRender = true
@@ -117,7 +116,7 @@ export async function pickOption(options: Option[], initial: number = 0): Promis
       if (!firstRender) {
         process.stdout.write(`\u001b[${linesCount}A\u001b[0J`)
       }
-      process.stdout.write('\x1b[90mSelect action (↑/↓, Enter, Esc to quit):\x1b[0m\n')
+      process.stdout.write("\x1b[90mSelect action (↑/↓, Enter, Esc to quit):\x1b[0m\n")
       options.forEach((opt, i) => {
         if (i === idx) {
           process.stdout.write(`\x1b[38;5;51m> ${opt.label}\x1b[0m\n`)
@@ -129,9 +128,9 @@ export async function pickOption(options: Option[], initial: number = 0): Promis
     }
 
     const cleanup = () => {
-      process.removeListener('exit', cleanup)
-      process.removeListener('SIGINT', cleanup)
-      process.stdin.removeListener('keypress', onKey)
+      process.removeListener("exit", cleanup)
+      process.removeListener("SIGINT", cleanup)
+      process.stdin.removeListener("keypress", onKey)
       if (process.stdin.isTTY) {
         process.stdin.setRawMode(wasRaw || false)
       }
@@ -151,22 +150,22 @@ export async function pickOption(options: Option[], initial: number = 0): Promis
     }
 
     // Safety guards
-    process.once('exit', cleanup)
-    process.once('SIGINT', cleanup)
+    process.once("exit", cleanup)
+    process.once("SIGINT", cleanup)
 
     const onKey = (str: string, key: any) => {
-      if (key.name === 'down') {
+      if (key.name === "down") {
         idx = (idx + 1) % options.length
         render()
-      } else if (key.name === 'up') {
+      } else if (key.name === "up") {
         idx = (idx - 1 + options.length) % options.length
         render()
-      } else if (key.name === 'return') {
+      } else if (key.name === "return") {
         cleanup()
         resolve(options[idx].value)
-      } else if (key.name === 'escape' || (key.ctrl && key.name === 'c')) {
+      } else if (key.name === "escape" || (key.ctrl && key.name === "c")) {
         cleanup()
-        resolve('exit')
+        resolve("exit")
       } else if (/^[1-9]$/.test(str)) {
         const n = Number(str) - 1
         if (n >= 0 && n < options.length) {
@@ -177,46 +176,46 @@ export async function pickOption(options: Option[], initial: number = 0): Promis
     }
 
     render()
-    process.stdin.on('keypress', onKey)
+    process.stdin.on("keypress", onKey)
   })
 }
 
 export function printHelp(): void {
   console.log(`indexer CLI (Local Mode)\n\n` +
-              `Usage:\n` +
-              `  indexer init         # create .indexer/ configs
+    `Usage:\n` +
+    `  indexer init         # install indexer
  ` +
-              `  indexer clean        # drop & reindex current project (alias: clear)
+    `  indexer clean        # drop & reindex current project (alias: clear)
  ` +
-              `  indexer status       # show status
+    `  indexer status       # show status
  ` +
-              `  indexer start        # start daemon
+    `  indexer start        # start daemon
  ` +
-              `  indexer stop         # stop daemon
+    `  indexer stop         # stop daemon
  ` +
-              `  indexer logs         # tail daemon logs (alias: log)
+    `  indexer logs         # tail daemon logs (alias: log)
  ` +
-              `  indexer projects      # list all tracked projects
+    `  indexer projects      # list all tracked projects
  ` +
-              `  indexer delete [id]  # delete project (interactive if no id)
+    `  indexer delete [id]  # delete project (interactive if no id)
  ` +
-              `  indexer uninstall    # remove .indexer/ from current project
+    `  indexer uninstall    # remove .indexer/ from current project
  ` +
-              `  indexer test <tool>  # test MCP tools (requires init)
+    `  indexer test <tool>  # test MCP tools (requires init)
  ` +
-              `  indexer mcp          # run MCP server (internal usage)\n\n` +
-              `MCP Test Tools (after init):\n` +
-              `  indexer test search_codebase  # test semantic search
+    `  indexer mcp          # run MCP server (internal usage)\n\n` +
+    `MCP Test Tools (after init):\n` +
+    `  indexer test search_codebase  # test semantic search
   ` +
-              `  indexer test search_symbols    # test symbol search
+    `  indexer test search_symbols    # test symbol search
   ` +
-              `  indexer test get_file_outline # test file outline
+    `  indexer test get_file_outline # test file outline
   ` +
-              `  indexer test get_project_structure # test project tree
+    `  indexer test get_project_structure # test project tree
   ` +
-              `  indexer test find_usages      # test find usages
+    `  indexer test find_usages      # test find usages
   ` +
-              `  indexer test dependency-graph # test dependency graph
+    `  indexer test dependency-graph # test dependency graph
   ` +
-              `  indexer test all              # run all tests\n`)
+    `  indexer test all              # run all tests\n`)
 }
