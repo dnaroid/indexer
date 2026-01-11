@@ -3,7 +3,8 @@ import path from "path"
 import {fail, log, warn} from "./cli-ui.js"
 import {DEFAULT_SETTINGS} from "../utils/config-global.js"
 import type {ProjectPaths, ProjectState} from "../types/index.js"
-import { fileURLToPath } from 'url'
+import {fileURLToPath} from "url"
+
 
 export async function pathExists(targetPath: string): Promise<boolean> {
   try {
@@ -458,22 +459,22 @@ export async function removeGitignoreEntry(root: string, entry: string): Promise
 export async function renderMcpProxyScript(paths: ProjectPaths, collectionId: string): Promise<string> {
   const __filename = fileURLToPath(import.meta.url)
   const __dirname = path.dirname(__filename)
-  const templatePath = path.join(__dirname, 'mcp-proxy-template.js')
-  
-  let template = ''
+  const templatePath = path.join(__dirname, "mcp-proxy-template.js")
+
+  let template = ""
   try {
-    template = await fs.readFile(templatePath, 'utf8')
+    template = await fs.readFile(templatePath, "utf8")
   } catch (e: any) {
     // Fallback if running from source/different structure or file missing
-    console.error('Failed to read proxy template:', e.message)
+    console.error("Failed to read proxy template:", e.message)
     // Fallback minimal script or re-throw
-    throw new Error('Could not find mcp-proxy-template.js')
+    throw new Error("Could not find mcp-proxy-template.js")
   }
 
   const defaultPort = String(DEFAULT_SETTINGS.SERVICE_PORT)
 
   return template
-    .replace('__COLLECTION_ID__', collectionId)
-    .replace('__PROJECT_ROOT__', paths.root)
-    .replace('__DEFAULT_PORT__', defaultPort)
+    .replace("__COLLECTION_ID__", collectionId)
+    .replace("__PROJECT_ROOT__", paths.root)
+    .replace("__DEFAULT_PORT__", defaultPort)
 }
