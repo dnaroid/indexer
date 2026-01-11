@@ -75,6 +75,7 @@ interface Option {
   value: string
 }
 
+
 export async function pickOption(options: Option[], initial: number = 0): Promise<string> {
   // Reset restored flag because we are entering interactive mode again
   terminalRestored = false
